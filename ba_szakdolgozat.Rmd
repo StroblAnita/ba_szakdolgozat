@@ -1,0 +1,56 @@
+---
+title: "BA szakdolgozat"
+author: "Stróbl Anita"
+date: "Last compiled on `r format(Sys.time(), '%d/%m/%Y, %X %Z')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 5
+    code_folding: hide
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE}
+
+options(scipen = 999)
+
+library(psych)
+library(tidyverse)
+library(dplyr)
+library(lme4)
+library(lmerTest)
+library(broom)
+library(lavaan)
+library(sjPlot)
+library(car)
+library(data.table)
+library(tibble)
+library(lubridate)
+library(naniar)
+library(hms)
+library(skimr)
+library(ggplot2)
+library(janitor)
+library(scales) 
+library(FSA)
+library(PMCMRplus)
+library(lsr)
+library(misty)
+library(rstatix)
+library(see)
+library(gridExtra)
+
+```
+
+```{r import_dataset}
+
+dat_1 <- read.csv("dat_1.csv")
+
+```
