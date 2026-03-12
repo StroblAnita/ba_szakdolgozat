@@ -54,3 +54,205 @@ library(gridExtra)
 dat_1 <- read.csv("dat_1.csv")
 
 ```
+
+``` {r sex_edu_factor}
+
+# Making sex variable considered as a factor
+dat_1  <-  
+  dat_1 %>%
+  mutate(sex = factor(sex, levels = c(1, 2, 3), labels = c("Female", "Male", "Other")))
+
+# Making edu variable consideres as a factor
+dat_1  <-  dat_1 %>%
+  mutate(edu = factor(edu, levels = c(1, 2, 3, 4, 5, 6, 7), 
+                      labels = c("Általános iskola vagy alacsonyabb (1)",
+                                 "Középiskola érettségi nélkül (2)", 
+                                 "Középiskola érettségivel (3)",
+                                 "Egyetemi alap diploma (4)",
+                                 "Egyetemi mester diploma (5)",
+                                 "Doktori fokozat (PhD) (6)", 
+                                 "Egyéb (7)")))
+
+```
+
+``` {r demography}
+
+# Creating distinct data
+dat_distinct <- dat_1 %>%
+  distinct(id_esm, .keep_all = TRUE)
+
+dat_ditinct_dem <- dat_distinct %>%
+  select(id_esm, age, sex, edu)
+
+# Creating demography tibble
+summary_dem <- dat_ditinct_dem %>% 
+  summarize(n=n(), 
+            age_mean=mean(age), age_sd=sd(age),  age_mdn=median(age), 
+            age_min=min(age), age_max=max(age),
+            n_female=sum(sex=="Female", na.rm = T),
+            female_pct=100/n*sum(sex=="Female", na.rm = T),
+            n_male=sum(sex=="Male", na.rm = T),
+            male_pct=100/n*sum(sex=="Male", na.rm = T),
+            n_other=sum(sex=="Other", na.rm = T), 
+            edu_1_pct=(sum(edu=="Általános iskola vagy alacsonyabb (1)", na.rm=T)/n())*100, 
+            n_edu_1=(sum(edu=="Általános iskola vagy alacsonyabb (1)", na.rm=T)),
+            edu_2_pct=(sum(edu=="Középiskola érettségi nélkül (2)",na.rm=T)/n())*100,
+            n_edu_2=(sum(edu=="Középiskola érettségi nélkül (2)",na.rm=T)),
+            edu_3_pct=(sum(edu=="Középiskola érettségivel (3)", na.rm=T)/n())*100, 
+            n_edu_3=(sum(edu=="Középiskola érettségivel (3)", na.rm=T)),
+            edu_4_pct=(sum(edu=="Egyetemi alap diploma (4)", na.rm=T)/n())*100, 
+            n_edu_4=(sum(edu=="Egyetemi alap diploma (4)", na.rm=T)),
+            edu_5_pct=(sum(edu=="Egyetemi mester diploma (5)", na.rm=T)/n())*100, 
+            n_edu_5=(sum(edu=="Egyetemi mester diploma (5)", na.rm=T)),
+            edu_6_pct=(sum(edu=="Doktori fokozat (PhD) (6)", na.rm=T)/n())*100,
+            n_edu_6=(sum(edu=="Doktori fokozat (PhD) (6)", na.rm=T)),
+            edu_7_pct=(sum(edu== "Egyéb (7)", na.rm=T)/n())*100,
+            n_edu_7=(sum(edu== "Egyéb (7)", na.rm=T)))
+
+tibble(summary_dem)
+
+```
+
+``` {r complience}
+
+# Creating distinct data
+dat_distinct <- dat_1 %>%
+  distinct(id_esm, .keep_all = TRUE)
+
+# Identifying day of quitting
+dat_maxday <- dat_1 %>%
+  select(id_esm, day, worried) %>%
+  filter(!is.na(worried)) %>%
+  group_by(id_esm) %>%
+  summarise(maxday = max(day))
+
+dat_1 <- dat_1 %>%
+  select(-any_of("maxday")) %>%
+  left_join(dat_maxday, by = "id_esm")
+
+# Number of days spent in the study
+dat_spentday <- dat_1 %>%
+  select(id_esm, maxday) %>%
+  distinct() %>%
+  reframe(N = n(),
+          mean_days = mean(maxday, na.rm = T),
+          mdn_days = median(maxday, na.rm = T),
+          sd_days = sd(maxday, na.rm = T),
+          min_days = min(maxday, na.rm = T),
+          max_days = max(maxday, na.rm = T))
+
+tibble(dat_spentday)
+
+# Calculating complience rate (percentage)
+dat_compl <- dat_1 %>%
+  select(id_esm, day, beep, maxday, worried) %>%
+  distinct() %>%
+  group_by(id_esm) %>%
+  reframe(compl_n  = sum(!is.na(worried)),
+          all_answer = maxday * 8,
+          compl_pct = (compl_n / all_answer) * 100) %>%
+  ungroup() %>%
+  reframe(N = n(),
+          mean_compl = mean(compl_pct, na.rm = T),
+          mdn_compl = median(compl_pct, na.rm = T),
+          sd_compl = sd(compl_pct, na.rm = T),
+          min_compl = min(compl_pct, na.rm = T),
+          max_compl = max(compl_pct, na.rm = T))
+  
+tibble(dat_compl)
+
+# calculating number of surveys completed
+dat_compl_n <- dat_1 %>%
+  select(id_esm, day, beep, maxday, worried) %>%
+  distinct() %>%
+  group_by(id_esm) %>%
+  reframe(compl_n  = sum(!is.na(worried)),
+          all_answer = maxday * 8,
+          compl_pct = (compl_n / all_answer) * 100) %>%
+  ungroup() %>%
+  reframe(N = n(),
+          mean_compl = mean(compl_n, na.rm = T),
+          mdn_compl = median(compl_n, na.rm = T),
+          sd_compl = sd(compl_n, na.rm = T),
+          min_compl = min(compl_n, na.rm = T),
+          max_compl = max(compl_n, na.rm = T))
+  
+tibble(dat_compl_n)
+
+#visualizing compliance rate
+# visualizing colors: 
+# positive: #F9D6AF / #FFC2C2
+# negative: #ABDCF5
+# dezorganized: #F5C8F8 / #DAD0F5
+# anything else: 
+
+``` 
+
+``` {r complience_visualization}
+
+dat_compl_vis <- dat_1 %>%
+  select(id_esm, day, beep, maxday, worried) %>%
+  distinct() %>%
+  group_by(id_esm) %>%
+  reframe(compl_n  = sum(!is.na(worried)),
+          all_answer = maxday * 8,
+          compl_pct = (compl_n / all_answer) * 100) %>%
+  ungroup() %>%
+  distinct()
+  
+ggplot(dat_compl_vis) +
+  geom_histogram(aes(compl_pct), bins = 40, fill = "#96CDCD") +
+  labs(
+    x = "Együttműködési ráta (%)",
+    y = "Résztvevők száma") +
+  theme_minimal(base_size = 12) +
+  theme(axis.title = element_text(size = 10))
+
+```
+
+``` {r MSS_descriptive}
+
+# Mutate MSS sum
+mssb_items <- list(
+  mssb_reverse = c("mss_bh_4", "mss_bh_10", "mss_bh_25", "mss_bh_37"),
+  mssb_neg = paste0("mss_bh_", seq(1, 37, by = 3)),
+  mssb_pos = paste0("mss_bh_", seq(2, 38, by = 3)),
+  mssb_dis = paste0("mss_bh_", seq(3, 36, by = 3))     )
+
+dat_1 <- dat_1 %>% 
+  mutate(dat = "dat_1") %>%
+  mutate(sch_neg = rowSums(select(., all_of(mssb_items$mssb_neg)), na.rm = T),
+        sch_pos = rowSums(select(., all_of(mssb_items$mssb_pos)), na.rm = T),
+        sch_dis = rowSums(select(., all_of(mssb_items$mssb_dis)), na.rm = T))
+
+# Creating distinct data
+dat_distinct <- dat_1 %>%
+  distinct(id_esm, .keep_all = TRUE)
+
+dat_distinct_mss <- dat_distinct %>%
+  select(id_esm, sch_neg, sch_pos, sch_dis)
+
+# # Creating MSS descriptive table
+summary_mss <- dat_distinct_mss %>% 
+  summarize(mean_sch_pos=mean(sch_pos, na.rm=T), 
+            sd_sch_pos=sd(sch_pos, na.rm=T), 
+            max_sch_pos=max(sch_pos, na.rm=T), 
+            min_sch_pos=min(sch_pos, na.rm=T),
+            mean_sch_neg=mean(sch_neg, na.rm=T), 
+            sd_sch_neg=sd(sch_neg, na.rm=T), 
+            max_sch_neg=max(sch_neg, na.rm=T), 
+            min_sch_neg=min(sch_neg, na.rm=T),
+            mean_sch_dis=mean(sch_dis, na.rm=T), 
+            sd_sch_dis=sd(sch_dis, na.rm=T),
+            max_sch_dis=max(sch_dis, na.rm=T), 
+            min_sch_dis=min(sch_dis, na.rm=T))
+
+tibble(summary_mss)
+
+```
+
+``` {r MSS_visualization}
+
+```
+
+
