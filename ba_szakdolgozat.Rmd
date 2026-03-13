@@ -49,7 +49,7 @@ library(gridExtra)
 
 ```
 
-```{r import_dataset}
+``` {r import_dataset}
 
 dat_1 <- read.csv("dat_1.csv")
 
@@ -212,7 +212,7 @@ dat_compl_vis <- dat_1 %>%
   ungroup() %>%
   distinct()
   
-ggplot(dat_compl_vis) +
+compl_vis <- ggplot(dat_compl_vis) +
   geom_histogram(aes(compl_pct), bins = 40, fill = "#8DD3C7") +
   labs(
     x = "Együttműködési ráta (%)",
@@ -260,17 +260,17 @@ dat_mss_vis <- dat_1 %>%
   distinct() %>%
   pivot_longer(cols = c(sch_neg, sch_pos, sch_dis), names_to = "group", values_to = "value") %>%
   mutate(group = factor(group, 
-                        levels = c("sch_neg", "sch_pos", "sch_dis",
-                        labels = c("Negatív", "Pozitív", "Dezorganizált"))))
+                        levels = c("sch_pos", "sch_neg", "sch_dis",
+                        labels = c("Pozitív", "Negatív", "Dezorganizált"))))
 
-sch_color <- c("#80B1D3", "#FC8D62", "#BC80BD")
+sch_color <- c("#FC8D62", "#80B1D3", "#BC80BD")
 
-ggplot(dat_mss_vis, aes(group, value, fill = group)) +
+mss_vis <- ggplot(dat_mss_vis, aes(group, value, fill = group)) +
   geom_violinhalf(color = NA, alpha = 0.9, position = position_nudge(x = 0.2, y = 0)) +
   geom_boxplot(color = "#505354", alpha = 0.9, width = 0.25, position = position_dodge(width = 0.3), outlier.shape = NA) + 
   scale_fill_manual(name = "MSS-B dimenziók", 
-                    labels = c("Negatív", "Pozitív", "Dezorganizált"), values = sch_color) +
-  scale_x_discrete(labels =c("Negatív", "Pozitív", "Dezorganizált"))  +
+                    labels = c("Pozitív", "Negatív", "Dezorganizált"), values = sch_color) +
+  scale_x_discrete(labels =c("Pozitív", "Negatív", "Dezorganizált"))  +
   labs(x = "MSS-B dimenziók", 
        y = "MSS-B dimenziók pontszáma") + 
   theme_minimal(base_size = 12) +
@@ -278,6 +278,8 @@ ggplot(dat_mss_vis, aes(group, value, fill = group)) +
         legend.title = element_text(size = 10),
         legend.text = element_text(size = 8),
         legend.position = "right")
+
+print(mss_vis)
 
 ```
 
@@ -316,7 +318,30 @@ print(alpha_dis)
 # Ha item(ek) reliabilitása kifejezetten alacsony, akkor érdemes kizárni őket a modellből?
 # pl. mss_bh_38 a = 0.13(?)
 ```
-``` {r worried_descriptive}
+
+``` {r MSS_pos_reliability_if_items_dropped}
+
+# items dropped: mss_bh_2 (pos), mss_bh_38 (pos)
+
+mssb_items_dropped <- list(
+  mssb_reverse = c("mss_bh_4", "mss_bh_10", "mss_bh_25", "mss_bh_37"),
+  mssb_neg = paste0("mss_bh_", seq(1, 37, by = 3)),
+  mssb_pos = c("mss_bh_5", "mss_bh_8", "mss_bh_11", "mss_bh_14", "mss_bh_17", "mss_bh_20", "mss_bh_23", "mss_bh_26", "mss_bh_29", "mss_bh_32", "mss_bh_35"),
+  mssb_dis = paste0("mss_bh_", seq(3, 36, by = 3)))
+
+dat_distinct <- dat_1 %>%
+  distinct(id_esm, .keep_all = TRUE)
+
+items_pos <- dat_distinct %>%
+  select(all_of(mssb_items_dropped$mssb_pos))
+cat("\n--- Pozitív reliabilitás ---\n")
+alpha_pos <- psych::alpha(items_pos, check.keys = T)
+item.alpha(items_pos)
+print(alpha_pos)
+
+```
+
+``` {r worried_between_descriptive_visualization}
 
 # Creating worried_mean
 dat_1 <- dat_1 %>%
@@ -338,7 +363,7 @@ summary_worried_between <- dat_distinct_worried %>%
 
 tibble(summary_worried_between)
 
-ggplot(dat_distinct_worried, aes(worried_between)) +
+worried_bw_vis <- ggplot(dat_distinct_worried, aes(worried_between)) +
   geom_histogram(bins = 40, fill = "#E5C494") +
   geom_vline(data = summary_worried_between, aes(xintercept = mdn_worried), linetype = "dotted", color = "#505354", size = 0.8)+ 
   geom_text(data = summary_worried_between, aes(x = mdn_worried, y = Inf, label = paste("Md =", sprintf("%.2f", mdn_worried))), vjust = 5, hjust = -0.1, fontface = "italic", size = 3.5) +
@@ -348,5 +373,65 @@ ggplot(dat_distinct_worried, aes(worried_between)) +
   theme_minimal(base_size = 12) +
   theme(axis.title = element_text(size = 10))
 
+print(worried_bw_vis)
+
 ```
+
+``` {r worried_within_visualization}
+
+# Visualizing within worried in ascending order
+worried_wi_vis <- dat_1 %>%
+  group_by(id_esm) %>%
+  summarize(mean_worried = mean(worried, na.rm = T),
+            sd_worried = sd(worried, na.rm = T)) %>%
+  mutate(id_esm = fct_reorder(factor(id_esm), mean_worried)) %>%
+  filter(!is.na(sd_worried)) %>%
+  ungroup()
+
+worried_wi_vis1 <- ggplot(worried_wi_vis, aes(id_esm, mean_worried)) +
+  geom_pointrange(aes(ymin = mean_worried - sd_worried, ymax = mean_worried + sd_worried), color = "#E5C494", size = 0.2) +
+  scale_x_discrete(breaks = function(x) x[seq(1, length(x), by = 10)]) +
+  labs(
+    x = "Résztvevők",
+    y = "Aggodalom átlaga és szórása (SE)"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_blank()) 
+
+print(worried_wi_vis1)
+
+# Visualizing within worried in "normality shape"
+worried_wi_vis_2 <- dat_1 %>%
+  group_by(id_esm) %>%
+  summarize(mean_worried = mean(worried, na.rm = T),
+            sd_worried = sd(worried, na.rm = T)) %>%
+  mutate(id_esm = fct_reorder(factor(id_esm), mean_worried)) %>%
+  filter(!is.na(sd_worried)) %>%
+  arrange(mean_worried)
+
+n <- nrow(worried_wi_vis_2)
+normality_arrange <- c(worried_wi_vis_2$id_esm[seq(1, n, by = 2)],
+                       rev(worried_wi_vis_2$id_esm[seq(2, n, by = 2)]))
+
+worried_wi_vis_2 <- worried_wi_vis_2 %>%
+  mutate(id_esm = factor(id_esm, levels = normality_arrange))
+
+worried_wi_vis2 <- ggplot(worried_wi_vis_2, aes(id_esm, mean_worried)) +
+  geom_pointrange(aes(ymin = mean_worried - sd_worried, 
+                      ymax = mean_worried + sd_worried), 
+                  color = "#E5C494", size = 0.2) +
+  scale_x_discrete(breaks = function(x) x[seq(1, length(x), by = 10)]) +
+  labs(
+    x = "Résztvevők",
+    y = "Aggodalom átlaga és szórása (SE)"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_blank())
+
+print(worried_wi_vis2)
+
+
+
+```
+
 
