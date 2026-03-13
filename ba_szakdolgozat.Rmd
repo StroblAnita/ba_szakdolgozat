@@ -213,7 +213,7 @@ dat_compl_vis <- dat_1 %>%
   distinct()
   
 ggplot(dat_compl_vis) +
-  geom_histogram(aes(compl_pct), bins = 40, fill = "#66C2A5") +
+  geom_histogram(aes(compl_pct), bins = 40, fill = "#8DD3C7") +
   labs(
     x = "Együttműködési ráta (%)",
     y = "Résztvevők száma") +
@@ -235,14 +235,17 @@ dat_distinct_mss <- dat_distinct %>%
 summary_mss <- dat_distinct_mss %>% 
   summarize(mean_sch_pos = round(mean(sch_pos, na.rm=T), digits = 2), 
             sd_sch_pos = round(sd(sch_pos, na.rm=T), digits = 2),  
+            mdn_sch_pos = round(median(sch_pos, na.rm=T), digits = 2), 
             max_sch_pos = round(max(sch_pos, na.rm=T), digits = 2), 
             min_sch_pos = round(min(sch_pos, na.rm=T), digits = 2), 
             mean_sch_neg = round(mean(sch_neg, na.rm=T), digits = 2), 
             sd_sch_neg = round(sd(sch_neg, na.rm=T), digits = 2), 
+            mdn_sch_neg = round(median(sch_neg, na.rm=T), digits = 2), 
             max_sch_neg = round(max(sch_neg, na.rm=T), digits = 2), 
             min_sch_neg = round(min(sch_neg, na.rm=T), digits = 2), 
             mean_sch_dis = round(mean(sch_dis, na.rm=T), digits = 2), 
             sd_sch_dis = round(sd(sch_dis, na.rm=T), digits = 2), 
+            mdn_sch_dis = round(median(sch_dis, na.rm=T), digits = 2),
             max_sch_dis = round(max(sch_dis, na.rm=T), digits = 2), 
             min_sch_dis = round(min(sch_dis, na.rm=T), digits = 2))
 
@@ -260,7 +263,7 @@ dat_mss_vis <- dat_1 %>%
                         levels = c("sch_neg", "sch_pos", "sch_dis",
                         labels = c("Negatív", "Pozitív", "Dezorganizált"))))
 
-sch_color <- c("#8DA0CB", "#FC8D62", "#BC80BD")
+sch_color <- c("#80B1D3", "#FC8D62", "#BC80BD")
 
 ggplot(dat_mss_vis, aes(group, value, fill = group)) +
   geom_violinhalf(color = NA, alpha = 0.9, position = position_nudge(x = 0.2, y = 0)) +
@@ -310,4 +313,40 @@ alpha_dis <- psych::alpha(items_dis, check.keys = T)
 item.alpha(items_dis)
 print(alpha_dis)
 
+# Ha item(ek) reliabilitása kifejezetten alacsony, akkor érdemes kizárni őket a modellből?
+# pl. mss_bh_38 a = 0.13(?)
 ```
+``` {r worried_descriptive}
+
+# Creating worried_mean
+dat_1 <- dat_1 %>%
+  group_by(id_esm) %>%
+  mutate(worried = as.numeric(gsub(",", ".", as.character(worried)))) %>%
+  mutate(worried_between = mean(worried, na.rm=T)) %>% 
+  ungroup()
+
+dat_distinct_worried <- dat_1 %>%
+  distinct(id_esm, .keep_all = TRUE) %>%
+  select(id_esm, day, beep, worried_between)
+
+summary_worried_between <- dat_distinct_worried %>% 
+  summarize(mean_worried_between = round(mean(worried_between, na.rm=T), digits = 2), 
+            sd_worried_between = round(sd(worried_between, na.rm=T), digits = 2), 
+            mdn_worried = round(median(worried_between, na.rm=T), digits = 2), 
+            max_worried_between = round(max(worried_between, na.rm=T), digits = 2), 
+            min_worried_between = round(min(worried_between, na.rm=T), digits = 2))
+
+tibble(summary_worried_between)
+
+ggplot(dat_distinct_worried, aes(worried_between)) +
+  geom_histogram(bins = 40, fill = "#E5C494") +
+  geom_vline(data = summary_worried_between, aes(xintercept = mdn_worried), linetype = "dotted", color = "#505354", size = 0.8)+ 
+  geom_text(data = summary_worried_between, aes(x = mdn_worried, y = Inf, label = paste("Md =", sprintf("%.2f", mdn_worried))), vjust = 5, hjust = -0.1, fontface = "italic", size = 3.5) +
+  labs(
+    x = "Aggodalom átlagos szintje az ESM adatfelvétel során",
+    y = "Résztvevők száma") +
+  theme_minimal(base_size = 12) +
+  theme(axis.title = element_text(size = 10))
+
+```
+
