@@ -1,0 +1,337 @@
+---
+title: "BA szakdolgozat"
+author: "Stróbl Anita"
+date: "Last compiled on `r format(Sys.time(), '%d/%m/%Y, %X %Z')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 5
+    code_folding: hide
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r}
+
+options(scipen = 999)
+
+library(psych)
+library(tidyverse)
+library(dplyr)
+library(lme4)
+library(lmerTest)
+library(broom)
+library(lavaan)
+library(sjPlot)
+library(car)
+library(data.table)
+library(tibble)
+library(lubridate)
+library(naniar)
+library(hms)
+library(skimr)
+library(ggplot2)
+library(janitor)
+library(scales) 
+library(FSA)
+library(PMCMRplus)
+library(lsr)
+library(misty)
+library(rstatix)
+library(see)
+library(gridExtra)
+library(see)
+library(gridExtra)
+library(semTools)
+library(performance)
+library(metafor)
+
+```
+
+``` {r import_dataset}
+
+dat_1 <- read.csv("dat_1.csv")
+
+```
+
+``` {r filter}
+
+dat_1 <- dat_1 %>%
+  filter(!(id_esm %in% c(9, 28, 35, 45, 75, 91, 94, 95, 122, 165, 171, 172, 176)))
+
+```
+
+``` {r sex_edu_factor}
+
+# Making sex variable considered as a factor
+dat_1  <-  
+  dat_1 %>%
+  mutate(sex = factor(sex, levels = c(2, 1, 3), labels = c("Férfi", "Nő", "Egyéb")))
+
+# Making edu variable consideres as a factor
+dat_1  <-  dat_1 %>%
+  mutate(edu = factor(edu, levels = c(1, 2, 3, 4, 5, 6, 7), 
+                      labels = c("Általános iskola vagy alacsonyabb",
+                                 "Középiskola érettségi nélkül", 
+                                 "Középiskola érettségivel",
+                                 "Egyetemi alap diploma",
+                                 "Egyetemi mester diploma",
+                                 "Doktori fokozat (PhD)", 
+                                 "Egyéb")))
+
+```
+
+``` {r MSS_sum}
+
+mssb_items <- list(
+  mssb_reverse = c("mss_bh_4", "mss_bh_10", "mss_bh_25", "mss_bh_37"),
+  mssb_neg = paste0("mss_bh_", seq(1, 37, by = 3)),
+  mssb_pos = paste0("mss_bh_", seq(2, 35, by = 3)), #ms_bh_38-
+  mssb_dis = paste0("mss_bh_", seq(3, 36, by = 3)))
+
+dat_1 <- dat_1 %>% 
+  mutate(dat = "dat_1") %>%
+  mutate(sch_neg = rowSums(select(., all_of(mssb_items$mssb_neg)), na.rm = T),
+        sch_pos = rowSums(select(., all_of(mssb_items$mssb_pos)), na.rm = T),
+        sch_dis = rowSums(select(., all_of(mssb_items$mssb_dis)), na.rm = T))
+
+```
+
+``` {r lmer}
+
+# age, sex?
+
+mn <- lmer(worried ~ sch_neg + (1|id_esm), data = dat_1)
+mp <- lmer(worried ~ sch_pos + (1|id_esm), data = dat_1)
+md <- lmer(worried ~ sch_dis + (1|id_esm), data = dat_1)
+
+
+m1 <- lmer(worried ~ sch_neg + sch_pos + (1|id_esm), data = dat_1)
+m2 <- lmer(worried ~ sch_pos + sch_dis + (1|id_esm), data = dat_1) # curious
+m3 <- lmer(worried ~ sch_neg + sch_dis + (1|id_esm), data = dat_1) # curious
+m4 <- lmer(worried ~ sch_neg + sch_pos + sch_dis + (1|id_esm), data = dat_1)
+  
+cat("\n--- SCH_NEG ---\n")
+summary(mn)
+cat("\n--- SCH_POS ---\n")
+summary(mp)
+cat("\n--- SCH_DIS ---\n")
+summary(md)
+cat("\n--- SCH_NEG + SCH_POS ---\n")
+summary(m1)
+cat("\n--- SCH_POS + SCH_DIS ---\n")
+summary(m2)
+cat("\n--- SCH_NEG + SCH_DIS ---\n")
+summary(m3)
+cat("\n--- SCH_POS + SCH_NEG + SCH_DIS ---\n")
+summary(m4)
+
+```
+
+``` {r instability}
+
+dat_1 <- dat_1 %>%
+  group_by(id_esm) %>% 
+  mutate(worried_between = mean(worried, na.rm=T)) %>% 
+  mutate(worried_within = worried - worried_between) %>%
+  mutate(worried_pmc = worried_between + worried_within) %>%
+  ungroup()
+
+dat_rmssd <- dat_1 %>% 
+  select(id_esm, day, beep, worried, worried_within) %>% 
+  arrange(id_esm, day, beep) %>% 
+  group_by(id_esm) %>% 
+  mutate(lag_worried_within = lag(worried_within)) %>%
+  mutate(squared_diff = (lag_worried_within - worried_within)^2,
+         rmssd_worried  =  sqrt(mean(squared_diff, na.rm = T))) %>%
+  ungroup()
+
+dat_rmssd <- dat_rmssd %>% 
+   select(id_esm, day, beep, rmssd_worried, worried_within, lag_worried_within)
+
+dat_1 <- dat_1 %>%
+  select(-any_of(c("rmssd_worried", "worried_within", "lag_worried_within"))) %>%
+  left_join(dat_rmssd, by = c("id_esm", "day", "beep"))
+
+head(dat_1)
+
+```
+
+``` {r inertia}
+
+autoreg_m <-
+  lmer(worried_pmc ~ beep + day + lag_worried_within + (lag_worried_within | id_esm),
+    data = dat_1)
+summary(autoreg_m)
+
+### extracting and joining fixed and random effects (as inertia of NA)   
+
+ranef  <- ranef(autoreg_m)
+
+autoreg_dat <- ranef$`id_esm` %>% 
+  rownames_to_column(var = 'id_esm') %>% 
+  mutate(id_esm = as.integer(id_esm)) %>% 
+  select(id_esm, inertia = lag_worried_within)
+
+dat_1 <- dat_1 %>% 
+  select(-any_of("inertia")) %>%
+  left_join(autoreg_dat, by = c("id_esm"))
+
+head(dat_1)
+
+```
+
+``` {r lm}
+
+library(see)
+
+dat_lm <- dat_1 %>%
+  rename(instability = rmssd_worried) %>%
+  select(id_esm, age, sex, sch_dis, sch_pos, sch_neg, instability, inertia, worried_between) %>%
+  distinct(id_esm, .keep_all = TRUE)
+
+lm_inertia_uncont <- 
+  lm(inertia ~ age + sex + sch_dis + sch_pos + sch_neg, data = dat_lm)
+lm_inertia_cont <-
+  lm(inertia ~ age + sex + sch_dis + sch_pos + sch_neg + instability + worried_between, data = dat_lm)
+
+lm_instability_uncont <- 
+  lm(instability ~ age + sex + sch_dis + sch_pos + sch_neg, data = dat_lm)
+lm_instability_cont <- 
+  lm(instability ~ age + sex + sch_dis + sch_pos + sch_neg + inertia + worried_between, data = dat_lm)
+
+lm_worried_mean_uncont <- 
+  lm(worried_between ~ age + sex + sch_dis + sch_pos + sch_neg, data = dat_lm)
+lm_worried_mean_cont <- 
+  lm(worried_between ~ age + sex + sch_dis + sch_pos + sch_neg + inertia + instability, data = dat_lm)
+
+cat("\n--- Inertia Uncont ---\n")
+summary(lm_inertia_uncont)
+car::vif(lm_inertia_uncont)        # testing multicollinearity
+check_normality(lm_inertia_uncont) # testing normality of residuals
+lmtest::bptest(lm_inertia_uncont)  # testing heteroscedasticity
+
+cat("\n--- Inertia Cont ---\n")
+summary(lm_inertia_cont)
+car::vif(lm_inertia_cont)        
+check_normality(lm_inertia_cont) 
+lmtest::bptest(lm_inertia_cont)
+
+cat("\n--- Instability Uncont ---\n")
+summary(lm_instability_uncont)
+car::vif(lm_instability_uncont)        
+check_normality(lm_instability_uncont) 
+lmtest::bptest(lm_instability_uncont)
+
+cat("\n--- Instability Cont ---\n")
+summary(lm_instability_cont)
+car::vif(lm_instability_cont)        
+check_normality(lm_instability_cont) 
+lmtest::bptest(lm_instability_cont)
+
+cat("\n--- Worried Mean ---\n")
+summary(lm_worried_mean_uncont)
+car::vif(lm_worried_mean_uncont)        
+check_normality(lm_worried_mean_uncont) 
+lmtest::bptest(lm_worried_mean_uncont)
+
+cat("\n--- Worried Mean ---\n")
+summary(lm_worried_mean_cont)
+car::vif(lm_worried_mean_cont)        
+check_normality(lm_worried_mean_cont) 
+lmtest::bptest(lm_worried_mean_cont)
+
+```
+
+``` {r bootstrap function}
+
+# setting resampling to 1000 as higher iterations crash bootstraps
+bootstrap <- function(model, R = 1000, seed = 123) {
+  set.seed(seed)
+  boot_model <- Boot(model, R = R, method = "case") # running bootstrap function, row-wise resampling
+  coef <- coef(model) # extracting original model coefficients
+  median <- apply(boot_model$t, 2, median) # getting median coefficients based on bootstrap distributions
+  se <- apply(boot_model$t, 2, sd) # bootstrapped SEs
+  p_vals <- apply(boot_model$t, 2, function(x) { # bootstrapped p values
+    2 * min(mean(x <= 0), mean(x >= 0))
+  })
+  ci <- confint(boot_model, type = "perc") # bootstrapped confidence intervals (95%)
+  results <- data.frame(  # putting them in a single df
+    term          = names(coef),
+    orig_estimate = coef,
+    boot_median   = median,
+    boot_se       = se,
+    boot_ci_lower = ci[, 1],
+    boot_ci_upper = ci[, 2],
+    boot_p_value  = p_vals
+  )
+  return(results)
+}
+
+```
+
+``` {r bootstrap inertia}
+
+inertia_models <- list(
+  inertia_uncont  = lm_inertia_uncont,
+  inertia_cont = lm_inertia_cont)
+
+boot_inertia <- lapply(inertia_models, bootstrap)
+boot_inertia_results <- bind_rows(boot_inertia, .id = "model")
+boot_inertia_results %>% filter(term == "sch_dis" | term == "sch_pos"| term == "sch_neg") %>% view()
+
+```
+
+``` {r bootstrap instability}
+
+instability_models <- list(
+  instability_uncont = lm_instability_uncont,
+  instability_cont = lm_instability_cont)
+
+boot_instability <- lapply(instability_models, bootstrap)
+boot_instability_results <- bind_rows(boot_instability, .id = "model")
+boot_instability_results %>% filter(term == "sch_dis" | term == "sch_pos"| term == "sch_neg") %>% view()
+
+```
+
+``` {r bootstrap instability}
+
+instability_models <- list(
+  instability_uncont = lm_instability_uncont,
+  instability_cont = lm_instability_cont)
+
+boot_instability <- lapply(instability_models, bootstrap)
+boot_instability_results <- bind_rows(boot_instability, .id = "model")
+boot_instability_results %>% filter(term == "sch_dis" | term == "sch_pos"| term == "sch_neg") %>% view()
+
+```
+
+``` {r bootstrap mean worried}
+
+worried_mean_models <- list(
+  worried_mean_uncont = lm_worried_mean_uncont,
+  worried_mean_cont = lm_worried_mean_cont)
+
+boot_worried_mean <- lapply(worried_mean_models, bootstrap)
+boot_worried_mean_results <- bind_rows(boot_worried_mean, .id = "model")
+boot_worried_mean_results %>% filter(term == "sch_dis" | term == "sch_pos"| term == "sch_neg") %>% view()
+
+```
+
+``` {r bootstrap vis}
+
+boot_inertia_vis <- boot_inertia_results %>% 
+  select(model, term, p = boot_p_value, estimate = boot_median, se = boot_se, ci.lb = boot_ci_lower, ci.ub = boot_ci_upper) %>% 
+  filter(model %in% c("inertia_uncont", "inertia_cont"))
+
+boot_instability_vis <- boot_instability_results %>% 
+  select(model, term, p = boot_p_value, estimate = boot_median, se = boot_se, ci.lb = boot_ci_lower, ci.ub = boot_ci_upper) %>% 
+  filter(model %in% c("instability_uncont", "instability_cont"))
+
+
+         
+
+
+```
