@@ -58,6 +58,8 @@ dat_1 <- read.csv("dat_1.csv")
 
 ``` {r filter}
 
+### Just if including inertia, instability!
+
 dat_1 <- dat_1 %>%
   filter(!(id_esm %in% c(9, 28, 35, 45, 75, 91, 94, 95, 122, 165, 171, 172, 176)))
 
@@ -127,6 +129,8 @@ cat("\n--- SCH_NEG + SCH_DIS ---\n")
 summary(m3)
 cat("\n--- SCH_POS + SCH_NEG + SCH_DIS ---\n")
 summary(m4)
+
+tab_model(mn, m1, m4, show.aicc = T, show.std = T, file = "lmer_models.doc")
 
 ```
 
@@ -245,6 +249,44 @@ lmtest::bptest(lm_worried_mean_cont)
 
 ```
 
+``` {r lm mean visu}
+
+dat_mean_visu <- dat_1 %>%
+  group_by(id_esm) %>% 
+  mutate(worried_between = mean(worried, na.rm=T)) %>% 
+  distinct(id_esm, .keep_all = TRUE) %>%
+  ungroup()
+
+dat_mean_visu <- dat_mean_visu %>%
+select(id_esm, sch_neg, sch_pos, sch_dis, worried, worried_between) %>%
+  pivot_longer(cols = c(sch_neg, sch_pos, sch_dis), names_to = "group", values_to = "value") %>%
+  mutate(group = factor(group, 
+                        levels = c("sch_pos", "sch_neg", "sch_dis"),
+                        labels = c("Pozitív", "Negatív", "Dezorganizált")))
+
+colors <- c("Negatív" = "#80B1D3", 
+            "Pozitív" = "#FC8D62FF", 
+            "Dezorganizált" = "#BC80BD") 
+
+lm_mean_visu <- ggplot(dat_mean_visu, aes(x = worried_between, y = value, color = group, fill = group)) +
+  geom_smooth(method = lm, se = T) +
+  scale_fill_manual(name = "Dimenzió",
+                     labels = c("Negatív", "Pozitív", "Dezorganizált"),
+                     values = colors) +
+  scale_color_manual(name = "Dimenzió",
+                     labels = c("Negatív", "Pozitív", "Dezorganizált"),
+                     values = colors) +
+  labs(title = "A dimenziók és az aggodalom átlagszintjének önálló lineáris regressziói",
+      x = "Aggodalom átlaga (worried_between)", 
+       y = "MSS-B dimenziók pontszáma") + 
+  theme_minimal(base_size = 12)
+  
+print(lm_mean_visu)
+
+
+```
+
+
 ``` {r bootstrap function}
 
 # setting resampling to 1000 as higher iterations crash bootstraps
@@ -320,6 +362,12 @@ boot_worried_mean_results %>% filter(term == "sch_dis" | term == "sch_pos"| term
 
 ```
 
+``` {r}
+
+tab_df(boot_worried_mean_results, show.aicc = T, show.std = T, file = "boot_mean_models.doc")
+
+```
+
 ``` {r creating bootstrap vis dat}
 
 boot_inertia_vis <- boot_inertia_results %>% 
@@ -352,11 +400,13 @@ boot_vis <-
       c("inertia_uncont", "instability_uncont", "worried_mean_uncont") ~ "Kontrollálatlan",
       c("inertia_cont", "instability_cont", "worried_mean_cont") ~ "Kontrollált"))
 
-colors <- c("Negatív" = "#FC8D62FF", 
-            "Pozitív" = "#66C2A5FF", 
-            "Dezorganizált" = "#8DA0CBFF") 
+colors <- c("Negatív" = "#80B1D3", 
+            "Pozitív" = "#FC8D62FF", 
+            "Dezorganizált" = "#BC80BD") 
 shape <- c("Kontrollálatlan" = 15,
            "Kontrollált" = 0)
+
+tab_df(boot_vis, show.aicc = T, show.std = T, file = "boot_models2.doc")
 
 ```
 
@@ -386,5 +436,6 @@ boot_plot <-
 
 print(boot_plot)
 
+tab_model(boot_instability_results, boot_instability_results, boot_worried_mean_results, show.aicc = T, show.std = T)
 
 ```
