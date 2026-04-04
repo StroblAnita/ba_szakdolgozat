@@ -12,3 +12,277 @@ editor_options:
   markdown: 
     wrap: 72
 ---
+
+```{r message=FALSE, warning=FALSE}
+
+options(scipen = 999)
+
+library(psych)
+library(tidyverse)
+library(dplyr)
+library(lme4)
+library(lmerTest)
+library(broom)
+library(lavaan)
+library(sjPlot)
+library(car)
+library(data.table)
+library(tibble)
+library(lubridate)
+library(naniar)
+library(hms)
+library(skimr)
+library(ggplot2)
+library(janitor)
+library(scales) 
+library(FSA)
+library(PMCMRplus)
+library(lsr)
+library(misty)
+library(rstatix)
+library(see)
+library(gridExtra)
+library(see)
+library(gridExtra)
+library(semTools)
+library(performance)
+library(metafor)
+
+```
+
+``` {r import_dataset}
+
+dat_1 <- read.csv("dat_1.csv")
+
+```
+
+``` {r sex_edu_factor}
+
+# Making sex variable considered as a factor
+dat_1  <-  
+  dat_1 %>%
+  mutate(sex = factor(sex, levels = c(2, 1, 3), labels = c("Férfi", "Nő", "Egyéb")))
+
+# Making edu variable consideres as a factor
+dat_1  <-  dat_1 %>%
+  mutate(edu = factor(edu, levels = c(1, 2, 3, 4, 5, 6, 7), 
+                      labels = c("Általános iskola vagy alacsonyabb",
+                                 "Középiskola érettségi nélkül", 
+                                 "Középiskola érettségivel",
+                                 "Egyetemi alap diploma",
+                                 "Egyetemi mester diploma",
+                                 "Doktori fokozat (PhD)", 
+                                 "Egyéb")))
+
+```
+
+``` {r MSS_sum}
+
+mssb_items <- list(
+  mssb_reverse = c("mss_bh_4", "mss_bh_10", "mss_bh_25", "mss_bh_37"),
+  mssb_neg = paste0("mss_bh_", seq(1, 37, by = 3)),
+  mssb_pos = paste0("mss_bh_", seq(2, 35, by = 3)), #ms_bh_38-
+  mssb_dis = paste0("mss_bh_", seq(3, 36, by = 3)))
+
+dat_1 <- dat_1 %>% 
+  mutate(dat = "dat_1") %>%
+  mutate(sch_neg = rowSums(select(., all_of(mssb_items$mssb_neg)), na.rm = T),
+        sch_pos = rowSums(select(., all_of(mssb_items$mssb_pos)), na.rm = T),
+        sch_dis = rowSums(select(., all_of(mssb_items$mssb_dis)), na.rm = T))
+
+```
+
+``` {r lmer 1.0}
+
+# age, sex?
+
+m_n <- lmer(worried ~ sch_neg + (1|id_esm), data = dat_1)
+m_p <- lmer(worried ~ sch_pos + (1|id_esm), data = dat_1)
+m_d <- lmer(worried ~ sch_dis + (1|id_esm), data = dat_1)
+
+
+m_np <- lmer(worried ~ sch_neg + sch_pos + (1|id_esm), data = dat_1)
+m_pd <- lmer(worried ~ sch_pos + sch_dis + (1|id_esm), data = dat_1) # curious
+m_nd <- lmer(worried ~ sch_neg + sch_dis + (1|id_esm), data = dat_1) # curious
+
+m_all <- lmer(worried ~ sch_neg + sch_pos + sch_dis + (1|id_esm), data = dat_1)
+  
+cat("\n--- SCH_NEG ---\n")
+summary(m_n)
+cat("\n--- SCH_POS ---\n")
+summary(m_p)
+cat("\n--- SCH_DIS ---\n")
+summary(m_d)
+cat("\n--- SCH_NEG + SCH_POS ---\n")
+summary(m_np)
+cat("\n--- SCH_POS + SCH_DIS ---\n")
+summary(m_pd)
+cat("\n--- SCH_NEG + SCH_DIS ---\n")
+summary(m_nd)
+cat("\n--- SCH_POS + SCH_NEG + SCH_DIS ---\n")
+summary(m_all)
+
+tab_model(m_n, m_np, m_all, show.aicc = T, show.std = T, file = "lmer_models.doc")
+
+```
+
+``` {r check lmer models}
+
+# performance package
+
+cat("\n--- SCH_NEG ---\n")
+check_collinearity(m_n)    
+check_normality(m_n)       
+check_heteroscedasticity(m_n) 
+
+cat("\n--- SCH_POS ---\n")
+check_collinearity(m_p)    
+check_normality(m_p)       
+check_heteroscedasticity(m_p) 
+
+cat("\n--- SCH_DIS ---\n")
+check_collinearity(m_d)    
+check_normality(m_d)       
+check_heteroscedasticity(m_d) 
+
+cat("\n--- SCH_NEG + SCH_POS ---\n")
+check_collinearity(m_np)    
+check_normality(m_np)       
+check_heteroscedasticity(m_np) 
+
+cat("\n--- SCH_POS + SCH_DIS ---\n")
+check_collinearity(m_p)    
+check_normality(m_p)       
+check_heteroscedasticity(m_p) 
+
+cat("\n--- SCH_NEG + SCH_DIS ---\n")
+check_collinearity(m_nd)    
+check_normality(m_nd)       
+check_heteroscedasticity(m_nd) 
+
+cat("\n--- SCH_POS + SCH_NEG + SCH_DIS ---\n")
+check_collinearity(m_all)    
+check_normality(m_all)       
+check_heteroscedasticity(m_all) 
+
+```
+
+``` {r bootstrap}
+
+# lmeresampler package
+# B = min. 1000!
+# B = 100 just for testing
+
+boot_m_n <- lmeresampler::bootstrap(m_n, .f = fixef, type = "wild", 
+              hccme =  "hc2", aux.dist = "mammen", 
+              B = 100, resample = c(TRUE, TRUE))
+
+boot_m_p <- lmeresampler::bootstrap(m_p, .f = fixef, type = "wild", 
+              hccme =  "hc2", aux.dist = "mammen", 
+              B = 100, resample = c(TRUE, TRUE))
+
+boot_m_d <- lmeresampler::bootstrap(m_d, .f = fixef, type = "wild", 
+              hccme =  "hc2", aux.dist = "mammen", 
+              B = 100, resample = c(TRUE, TRUE))
+
+boot_m_np <- lmeresampler::bootstrap(m_np, .f = fixef, type = "wild", 
+              hccme =  "hc2", aux.dist = "mammen", 
+              B = 100, resample = c(TRUE, TRUE))
+
+boot_m_pd <- lmeresampler::bootstrap(m_pd, .f = fixef, type = "wild", 
+              hccme =  "hc2", aux.dist = "mammen", 
+              B = 100, resample = c(TRUE, TRUE))
+
+boot_m_nd <- lmeresampler::bootstrap(m_nd, .f = fixef, type = "wild", 
+              hccme =  "hc2", aux.dist = "mammen", 
+              B = 100, resample = c(TRUE, TRUE))
+
+boot_m_all <- lmeresampler::bootstrap(m_all, .f = fixef, type = "wild", 
+              hccme =  "hc2", aux.dist = "mammen", 
+              B = 100, resample = c(TRUE, TRUE))
+
+
+```
+
+``` {r boot table}
+
+# lmersampler package
+
+boot_list <- list(
+  "Pozitív" = boot_m_p,
+  "Negatív" = boot_m_n,
+  "Dezorganizált" = boot_m_d,
+  "Negatív - Pozitív" = boot_m_np,
+  "Pozitív - Dezorganizált" = boot_m_pd,
+  "Negatív - Dezorganizált" = boot_m_nd,
+  "Pozitív - Negatív - Dezorganizált" = boot_m_all)
+
+boot_table_f <- function(boot_table) {
+  median <- apply(boot_table$replicates, 2, median) 
+  se <- apply(boot_table$replicates, 2, sd) 
+  ci <- confint(boot_table, type = "perc")
+  p_vals <- apply(boot_table$replicates, 2, function(x) { 
+    2 * min(mean(x <= 0, na.rm = TRUE), mean(x >= 0, na.rm = TRUE))
+  })
+  results <- data.frame(
+    term          = ci$term,
+    orig_estimate = ci$estimate,
+    boot_median   = median,
+    boot_se       = se,
+    boot_ci_lower = ci$lower,
+    boot_ci_upper = ci$upper,
+    boot_p_value  = p_vals,
+    stringsAsFactors = FALSE
+)
+  return(results)
+}
+
+boot_lmer_table <- map_df(boot_list, boot_table_f, .id = "model") %>%
+  filter(term != "(Intercept)") %>%
+  mutate(term = factor(term,
+                      levels = c("sch_neg", "sch_pos", "sch_dis"),
+                      labels = c("Negatív", "Pozitív", "Dezorganizált")))
+
+```
+
+``` {r boot vis}
+
+boot_lmer_table$term <- factor(boot_lmer_table$term, 
+                               levels = c("Pozitív", "Negatív", "Dezorganizált"))
+boot_lmer_table$model <- factor(boot_lmer_table$model, 
+                                levels = c("Pozitív - Negatív - Dezorganizált",
+                                           "Negatív - Dezorganizált",
+                                           "Pozitív - Dezorganizált",
+                                           "Negatív - Pozitív",
+                                           "Dezorganizált",
+                                           "Negatív",
+                                           "Pozitív"))
+
+colors <- c("Pozitív" = "#FC8D62FF",
+            "Negatív" = "#80B1D3", 
+            "Dezorganizált" = "#BC80BD")  
+
+boot_worried <- 
+  ggplot(boot_lmer_table, aes(x = (boot_ci_lower + boot_ci_upper) / 2, y = model, xmin = boot_ci_lower, xmax = boot_ci_upper)) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "darkgrey", linewidth = 0.5, alpha = 0.8) +
+  geom_pointrange(
+    aes(color = term, group = term), 
+    position = position_dodge(width = 0.3), 
+    size = 0.8) +
+  scale_color_manual(name = "Dimenzió",
+                     labels = c("Pozitív", "Negatív", "Dezorganizált"),
+                     values = colors) +
+  labs(title = "Aggodalom - multilevel modellek bootstrappelt becslései",
+       x = "Bootstrappelt becslések (95% CI)", 
+       y = NULL) + 
+  theme_minimal(base_size = 10) +
+  theme(
+    legend.position = "right",
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank())
+
+print(boot_worried)
+
+#ggsave("boot_worried.png", plot = boot_worried, height = 12, width = 20, units = "cm", dpi = 300)
+
+```
