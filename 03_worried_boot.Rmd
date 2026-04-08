@@ -1,0 +1,71 @@
+---
+title: "03_worried_boot"
+author: "Stróbl Anita"
+date: "Last compiled on `r format(Sys.time(), '%d/%m/%Y, %X %Z')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 5
+    code_folding: hide
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r message=FALSE, warning=FALSE}
+
+options(scipen = 999)
+
+library(psych)
+library(tidyverse)
+library(dplyr)
+library(lme4)
+library(lmerTest)
+library(broom)
+library(lavaan)
+library(sjPlot)
+library(car)
+library(data.table)
+library(tibble)
+library(lubridate)
+library(naniar)
+library(hms)
+library(skimr)
+library(ggplot2)
+library(janitor)
+library(scales) 
+library(FSA)
+library(PMCMRplus)
+library(lsr)
+library(misty)
+library(rstatix)
+library(see)
+library(gridExtra)
+library(see)
+library(gridExtra)
+library(semTools)
+library(performance)
+library(metafor)
+
+```
+
+``` {r import dataset, message=FALSE, warning=FALSE}
+
+dat_1 <- read_csv("dat_1_m.csv")
+
+```
+
+``` {r read lmer models}
+
+m_n <- readRDS("lmer_models/m_n.rds")
+m_p <- readRDS("lmer_models/m_p.rds")
+m_d <- readRDS("lmer_models/m_d.rds")
+m_np <- readRDS("lmer_models/m_np.rds")
+m_pd <- readRDS("lmer_models/m_pd.rds")
+m_nd <- readRDS("lmer_models/m_nd.rds")
+m_nd <- readRDS(m_all, "lmer_models/m_all.rds")
+
+```
+
+```
