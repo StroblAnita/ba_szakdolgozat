@@ -64,8 +64,157 @@ m_d <- readRDS("lmer_models/m_d.rds")
 m_np <- readRDS("lmer_models/m_np.rds")
 m_pd <- readRDS("lmer_models/m_pd.rds")
 m_nd <- readRDS("lmer_models/m_nd.rds")
-m_nd <- readRDS(m_all, "lmer_models/m_all.rds")
+m_all <- readRDS("lmer_models/m_all.rds")
 
 ```
+
+``` {r bootstrap}
+
+# lmeresampler package
+
+boot_m_n <- lmeresampler::bootstrap(m_n, .f = fixef, type = "wild", 
+              hccme =  "hc2", aux.dist = "mammen", 
+              B = 1000, resample = c(TRUE, TRUE))
+
+boot_m_p <- lmeresampler::bootstrap(m_p, .f = fixef, type = "wild", 
+              hccme =  "hc2", aux.dist = "mammen", 
+              B = 1000, resample = c(TRUE, TRUE))
+
+boot_m_d <- lmeresampler::bootstrap(m_d, .f = fixef, type = "wild", 
+              hccme =  "hc2", aux.dist = "mammen", 
+              B = 1000, resample = c(TRUE, TRUE))
+
+boot_m_np <- lmeresampler::bootstrap(m_np, .f = fixef, type = "wild", 
+              hccme =  "hc2", aux.dist = "mammen", 
+              B = 1000, resample = c(TRUE, TRUE))
+
+boot_m_pd <- lmeresampler::bootstrap(m_pd, .f = fixef, type = "wild", 
+              hccme =  "hc2", aux.dist = "mammen", 
+              B = 1000, resample = c(TRUE, TRUE))
+
+boot_m_nd <- lmeresampler::bootstrap(m_nd, .f = fixef, type = "wild", 
+              hccme =  "hc2", aux.dist = "mammen", 
+              B = 1000, resample = c(TRUE, TRUE))
+
+boot_m_all <- lmeresampler::bootstrap(m_all, .f = fixef, type = "wild", 
+              hccme =  "hc2", aux.dist = "mammen", 
+              B = 1000, resample = c(TRUE, TRUE))
+
+
+```
+
+``` {r save read boot rds}
+
+# saveRDS(boot_m_n, "boot_models/boot_m_n.rds")
+# saveRDS(boot_m_p, "boot_models/boot_m_p.rds")
+# saveRDS(boot_m_d, "boot_models/boot_m_d.rds")
+# saveRDS(boot_m_np, "boot_models/boot_m_np.rds")
+# saveRDS(boot_m_pd, "boot_models/boot_m_pd.rds")
+# saveRDS(boot_m_nd, "boot_models/boot_m_nd.rds")
+# saveRDS(boot_m_all, "boot_models/boot_m_all.rds")
+
+boot_m_p <- readRDS("boot_models/boot_m_n.rds")
+boot_m_n <- readRDS("boot_models/boot_m_p.rds")
+boot_m_d <- readRDS("boot_models/boot_m_d.rds")
+boot_m_np <- readRDS("boot_models/boot_m_np.rds")
+boot_m_pd <- readRDS("boot_models/boot_m_pd.rds")
+boot_m_nd <- readRDS("boot_models/boot_m_nd.rds")
+boot_m_all <- readRDS("boot_models/boot_m_all.rds")
+
+```
+
+``` {r boot table}
+
+# lmersampler package
+
+boot_list <- list(
+  "Pozitív" = boot_m_p,
+  "Negatív" = boot_m_n,
+  "Dezorganizált" = boot_m_d,
+  "Negatív - Pozitív" = boot_m_np,
+  "Pozitív - Dezorganizált" = boot_m_pd,
+  "Negatív - Dezorganizált" = boot_m_nd,
+  "Pozitív - Negatív - Dezorganizált" = boot_m_all)
+
+boot_table_f <- function(boot_table) {
+  median <- apply(boot_table$replicates, 2, median) 
+  se <- apply(boot_table$replicates, 2, sd) 
+  ci <- confint(boot_table, type = "perc")
+  p_vals <- apply(boot_table$replicates, 2, function(x) { 
+    2 * min(mean(x <= 0, na.rm = TRUE), mean(x >= 0, na.rm = TRUE))
+  })
+  results <- data.frame(
+    term          = ci$term,
+    orig_estimate = ci$estimate,
+    boot_median   = median,
+    boot_se       = se,
+    boot_ci_lower = ci$lower,
+    boot_ci_upper = ci$upper,
+    boot_p_value  = p_vals,
+    stringsAsFactors = FALSE
+)
+  return(results)
+}
+
+boot_lmer_table <- map_df(boot_list, boot_table_f, .id = "model") %>%
+  filter(term != "(Intercept)") %>%
+  mutate(term = factor(term,
+                      levels = c("sch_neg", "sch_pos", "sch_dis"),
+                      labels = c("Negatív", "Pozitív", "Dezorganizált")))
+
+saveRDS(boot_lmer_table, "boot_models/boot_lmer_table")
+
+```
+
+``` {r boot vis}
+
+boot_lmer_table$term <- factor(boot_lmer_table$term, 
+                               levels = c("Pozitív", "Negatív", "Dezorganizált"))
+boot_lmer_table$model <- factor(boot_lmer_table$model, 
+                                levels = c("Pozitív - Negatív - Dezorganizált",
+                                           "Negatív - Dezorganizált",
+                                           "Pozitív - Dezorganizált",
+                                           "Negatív - Pozitív",
+                                           "Dezorganizált",
+                                           "Negatív",
+                                           "Pozitív"))
+
+boot_lmer_table <- boot_lmer_table %>%
+  mutate(p_sign = case_when(
+    boot_p_value < 0.05 ~ "p < 0,05",
+    boot_p_value > 0.05 ~ "p > 0,05"))
+
+
+colors <- c("Pozitív" = "#FC8D62FF",
+            "Negatív" = "#80B1D3", 
+            "Dezorganizált" = "#BC80BD")
+shapes <- c("p < 0,05"= 16,
+           "p > 0,05" = 1)
+
+boot_worried <- 
+  ggplot(boot_lmer_table, aes(x = (boot_ci_lower + boot_ci_upper) / 2, y = model, xmin = boot_ci_lower, xmax = boot_ci_upper)) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "darkgrey", linewidth = 0.5, alpha = 0.8) +
+  geom_pointrange(
+    aes(color = term, shape = p_sign, group = term), 
+    position = position_dodge(width = 0.3), 
+    linewidth = 0.8, size = 0.8) +
+  scale_color_manual(name = "Dimenzió",
+                     labels = c("Pozitív", "Negatív", "Dezorganizált"),
+                     values = colors) +
+  scale_shape_manual(name = "Szignifikancia",
+                     labels = c("p < 0,05", "p > 0,05"),
+                     values = shapes) +
+  labs(title = "Aggodalom - multilevel modellek bootstrappelt becslései",
+       x = "Bootstrappelt becslések (95% CI)", 
+       y = NULL) + 
+  theme_minimal(base_size = 10) +
+  theme(
+    legend.position = "right",
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank())
+
+print(boot_worried)
+
+ggsave("plots/boot_worried.png", plot = boot_worried, height = 12, width = 20, units = "cm", dpi = 300)
 
 ```
