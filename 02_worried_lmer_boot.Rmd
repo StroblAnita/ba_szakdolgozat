@@ -49,50 +49,13 @@ library(performance)
 library(metafor)
 
 ```
+``` {r import dataset, message=FALSE, warning=FALSE}
 
-``` {r import_dataset}
-
-dat_1 <- read.csv("dat_1.csv")
-
-```
-
-``` {r sex_edu_factor}
-
-# Making sex variable considered as a factor
-dat_1  <-  
-  dat_1 %>%
-  mutate(sex = factor(sex, levels = c(2, 1, 3), labels = c("Férfi", "Nő", "Egyéb")))
-
-# Making edu variable consideres as a factor
-dat_1  <-  dat_1 %>%
-  mutate(edu = factor(edu, levels = c(1, 2, 3, 4, 5, 6, 7), 
-                      labels = c("Általános iskola vagy alacsonyabb",
-                                 "Középiskola érettségi nélkül", 
-                                 "Középiskola érettségivel",
-                                 "Egyetemi alap diploma",
-                                 "Egyetemi mester diploma",
-                                 "Doktori fokozat (PhD)", 
-                                 "Egyéb")))
+dat_1 <- read_csv("dat_1_m.csv")
 
 ```
 
-``` {r MSS_sum}
-
-mssb_items <- list(
-  mssb_reverse = c("mss_bh_4", "mss_bh_10", "mss_bh_25", "mss_bh_37"),
-  mssb_neg = paste0("mss_bh_", seq(1, 37, by = 3)),
-  mssb_pos = paste0("mss_bh_", seq(2, 35, by = 3)), #ms_bh_38-
-  mssb_dis = paste0("mss_bh_", seq(3, 36, by = 3)))
-
-dat_1 <- dat_1 %>% 
-  mutate(dat = "dat_1") %>%
-  mutate(sch_neg = rowSums(select(., all_of(mssb_items$mssb_neg)), na.rm = T),
-        sch_pos = rowSums(select(., all_of(mssb_items$mssb_pos)), na.rm = T),
-        sch_dis = rowSums(select(., all_of(mssb_items$mssb_dis)), na.rm = T))
-
-```
-
-``` {r lmer 1.0}
+``` {r lmer worried}
 
 # age, sex?
 
@@ -123,6 +86,18 @@ cat("\n--- SCH_POS + SCH_NEG + SCH_DIS ---\n")
 summary(m_all)
 
 tab_model(m_n, m_np, m_all, show.aicc = T, show.std = T, file = "lmer_models.doc")
+
+```
+
+``` {r save lmer models}
+
+# saveRDS(m_n, "lmer_models/m_n.rds")
+# saveRDS(m_p, "lmer_models/m_p.rds")
+# saveRDS(m_d, "lmer_models/m_d.rds")
+# saveRDS(m_np, "lmer_models/m_np.rds")
+# saveRDS(m_pd, "lmer_models/m_pd.rds")
+# saveRDS(m_nd, "lmer_models/m_nd.rds")
+# saveRDS(m_all, "lmer_models/m_all.rds")
 
 ```
 
@@ -167,122 +142,200 @@ check_heteroscedasticity(m_all)
 
 ```
 
-``` {r bootstrap}
+``` {r extacting lmer data for visualization function}
 
-# lmeresampler package
-# B = min. 1000!
-# B = 100 just for testing
-
-boot_m_n <- lmeresampler::bootstrap(m_n, .f = fixef, type = "wild", 
-              hccme =  "hc2", aux.dist = "mammen", 
-              B = 100, resample = c(TRUE, TRUE))
-
-boot_m_p <- lmeresampler::bootstrap(m_p, .f = fixef, type = "wild", 
-              hccme =  "hc2", aux.dist = "mammen", 
-              B = 100, resample = c(TRUE, TRUE))
-
-boot_m_d <- lmeresampler::bootstrap(m_d, .f = fixef, type = "wild", 
-              hccme =  "hc2", aux.dist = "mammen", 
-              B = 100, resample = c(TRUE, TRUE))
-
-boot_m_np <- lmeresampler::bootstrap(m_np, .f = fixef, type = "wild", 
-              hccme =  "hc2", aux.dist = "mammen", 
-              B = 100, resample = c(TRUE, TRUE))
-
-boot_m_pd <- lmeresampler::bootstrap(m_pd, .f = fixef, type = "wild", 
-              hccme =  "hc2", aux.dist = "mammen", 
-              B = 100, resample = c(TRUE, TRUE))
-
-boot_m_nd <- lmeresampler::bootstrap(m_nd, .f = fixef, type = "wild", 
-              hccme =  "hc2", aux.dist = "mammen", 
-              B = 100, resample = c(TRUE, TRUE))
-
-boot_m_all <- lmeresampler::bootstrap(m_all, .f = fixef, type = "wild", 
-              hccme =  "hc2", aux.dist = "mammen", 
-              B = 100, resample = c(TRUE, TRUE))
-
-
-```
-
-``` {r boot table}
-
-# lmersampler package
-
-boot_list <- list(
-  "Pozitív" = boot_m_p,
-  "Negatív" = boot_m_n,
-  "Dezorganizált" = boot_m_d,
-  "Negatív - Pozitív" = boot_m_np,
-  "Pozitív - Dezorganizált" = boot_m_pd,
-  "Negatív - Dezorganizált" = boot_m_nd,
-  "Pozitív - Negatív - Dezorganizált" = boot_m_all)
-
-boot_table_f <- function(boot_table) {
-  median <- apply(boot_table$replicates, 2, median) 
-  se <- apply(boot_table$replicates, 2, sd) 
-  ci <- confint(boot_table, type = "perc")
-  p_vals <- apply(boot_table$replicates, 2, function(x) { 
-    2 * min(mean(x <= 0, na.rm = TRUE), mean(x >= 0, na.rm = TRUE))
-  })
-  results <- data.frame(
-    term          = ci$term,
-    orig_estimate = ci$estimate,
-    boot_median   = median,
-    boot_se       = se,
-    boot_ci_lower = ci$lower,
-    boot_ci_upper = ci$upper,
-    boot_p_value  = p_vals,
-    stringsAsFactors = FALSE
-)
-  return(results)
+build_plot_data <- function(model, raw_data, focal_var, model_name = "Model", steps = 100) {
+  
+  # 1. Filter out missing data (NA)
+  variables <- all.vars(formula(model))
+  lmer_data <- na.omit(raw_data[, variables, drop = FALSE])
+  
+  # 2. Extract the approximated p-value using standard lme4 output
+  coef_table <- coef(summary(model))
+  
+  if (focal_var %in% rownames(coef_table)) {
+    t_value <- coef_table[focal_var, "t value"]
+    extracted_p_value <- 2 * (1 - pnorm(abs(t_value)))
+  } else {
+    extracted_p_value <- NA 
+  }
+  
+  # 3. Determine the minimum and maximum of the X-axis (the focal variable)
+  var_min <- 0
+  var_max <- 12
+  x_vals <- seq(var_min, var_max, length.out = steps) 
+  
+  # 4. Extract the Variance-Covariance matrix of the model for CI calculation
+  V_matrix <- as.matrix(vcov(model))
+  
+  results <- list()
+  
+  # 5. THE THOUGHT EXPERIMENT: Iterate through the points on the X-axis
+  for (x in x_vals) {
+    
+    # A) Take the real data 
+    temp_data <- lmer_data
+    
+    # B) ONLY overwrite the focal variable for everyone to the current scale point
+    temp_data[[focal_var]] <- x 
+    
+    # C) Prediction in the real context
+    pred_vals <- predict(model, newdata = temp_data, re.form = NA)
+    
+    # D) Calculate Confidence Interval 
+    X_matrix <- model.matrix(terms(model), temp_data)
+    se_vals <- sqrt(rowSums((X_matrix %*% V_matrix) * X_matrix))
+    
+    # E) Averaging 
+    mean_pred <- mean(pred_vals)
+    mean_se <- mean(se_vals)
+    
+    # F) Save the results to the final table
+    results[[length(results) + 1]] <- data.frame(
+      dim_value = x,
+      worried_value = mean_pred,
+      conf.low = mean_pred - (1.96 * mean_se),
+      conf.high = mean_pred + (1.96 * mean_se),
+      p_value = extracted_p_value,
+      dimension = focal_var,
+      model = model_name,
+      stringsAsFactors = FALSE
+    )
+  }
+  
+  # Return the combined table
+  return(do.call(rbind, results))
 }
 
-boot_lmer_table <- map_df(boot_list, boot_table_f, .id = "model") %>%
-  filter(term != "(Intercept)") %>%
-  mutate(term = factor(term,
-                      levels = c("sch_neg", "sch_pos", "sch_dis"),
-                      labels = c("Negatív", "Pozitív", "Dezorganizált")))
+```
+
+``` {r extacting lmer data for visualization}
+
+df_mn <- build_plot_data(model = m_n, raw_data = dat_1, focal_var = "sch_neg", 
+                         model_name = "Negatív")
+df_mp <- build_plot_data(model = m_p, raw_data = dat_1, focal_var = "sch_pos", 
+                         model_name = "Pozitív")
+df_md <- build_plot_data(model = m_d, raw_data = dat_1, focal_var = "sch_dis", 
+                         model_name = "Dezorganizált")
+
+df_m_np_n <- build_plot_data(model = m_np, raw_data = dat_1, focal_var = "sch_neg", 
+                             model_name = "Negatív - Pozitív")
+df_m_np_p <- build_plot_data(model = m_np, raw_data = dat_1, focal_var = "sch_pos", 
+                             model_name = "Negatív - Pozitív")
+
+df_m_pd_p <- build_plot_data(model = m_pd, raw_data = dat_1, focal_var = "sch_pos", 
+                             model_name = "Pozitív - Dezorganizált")
+df_m_pd_d <- build_plot_data(model = m_pd, raw_data = dat_1, focal_var = "sch_dis", 
+                             model_name = "Pozitív - Dezorganizált")
+
+df_m_nd_n <- build_plot_data(model = m_nd, raw_data = dat_1, focal_var = "sch_neg", 
+                             model_name = "Dezorganizált - Negatív")
+df_m_nd_d <- build_plot_data(model = m_nd, raw_data = dat_1, focal_var = "sch_dis", 
+                             model_name = "Dezorganizált - Negatív")
+
+df_m_all_n <- build_plot_data(model = m_all, raw_data = dat_1, focal_var = "sch_neg", 
+                              model_name = "Negatív - Pozitív - Dezorganizáció")
+df_m_all_p <- build_plot_data(model = m_all, raw_data = dat_1, focal_var = "sch_pos", 
+                              model_name = "Negatív - Pozitív - Dezorganizáció")
+df_m_all_d <- build_plot_data(model = m_all, raw_data = dat_1, focal_var = "sch_dis", 
+                              model_name = "Negatív - Pozitív - Dezorganizáció")
+
+### Bind rows datasets
+
+dat_lmer_all <- bind_rows(df_m_all_n, df_m_all_p, df_m_all_d) %>%
+  mutate(dimension = factor(dimension, 
+                           levels = c("sch_neg", "sch_pos", "sch_dis"),
+                           labels = c("Negatív", "Pozitív", "Dezorganizált")))
+
+dat_lmer_facet <- bind_rows(df_mn, df_mp, df_md,
+                            df_m_np_n, df_m_np_p,
+                            df_m_pd_p, df_m_pd_d,
+                            df_m_nd_n, df_m_nd_d) %>%
+  mutate(dimension = factor(dimension, 
+                           levels = c("sch_neg", "sch_pos", "sch_dis"),
+                           labels = c("Negatív", "Pozitív", "Dezorganizált"))) %>%
+  mutate(model = factor(model,
+                        levels = c("Negatív", "Dezorganizált - Negatív",
+                                   "Pozitív", "Negatív - Pozitív",
+                                   "Dezorganizált", "Pozitív - Dezorganizált")))
 
 ```
 
-``` {r boot vis}
+``` {r lmer plot all}
 
-boot_lmer_table$term <- factor(boot_lmer_table$term, 
-                               levels = c("Pozitív", "Negatív", "Dezorganizált"))
-boot_lmer_table$model <- factor(boot_lmer_table$model, 
-                                levels = c("Pozitív - Negatív - Dezorganizált",
-                                           "Negatív - Dezorganizált",
-                                           "Pozitív - Dezorganizált",
-                                           "Negatív - Pozitív",
-                                           "Dezorganizált",
-                                           "Negatív",
-                                           "Pozitív"))
+colors <- c("Negatív" = "#80B1D3", 
+            "Pozitív" = "#FC8D62FF", 
+            "Dezorganizált" = "#BC80BD") 
 
-colors <- c("Pozitív" = "#FC8D62FF",
-            "Negatív" = "#80B1D3", 
-            "Dezorganizált" = "#BC80BD")  
 
-boot_worried <- 
-  ggplot(boot_lmer_table, aes(x = (boot_ci_lower + boot_ci_upper) / 2, y = model, xmin = boot_ci_lower, xmax = boot_ci_upper)) +
-  geom_vline(xintercept = 0, linetype = "dashed", color = "darkgrey", linewidth = 0.5, alpha = 0.8) +
-  geom_pointrange(
-    aes(color = term, group = term), 
-    position = position_dodge(width = 0.3), 
-    size = 0.8) +
+plot_lmer_all <- ggplot(dat_lmer_all, aes(dim_value, worried_value , color = dimension, fill = dimension)) +
+  geom_line(size = 1) + 
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.3, color = NA) +
+  scale_fill_manual(name = "Dimenzió",
+                    labels = c("Negatív", "Pozitív", "Dezorganizált"),
+                    values = colors) +
   scale_color_manual(name = "Dimenzió",
-                     labels = c("Pozitív", "Negatív", "Dezorganizált"),
+                     labels = c("Negatív", "Pozitív", "Dezorganizált"),
                      values = colors) +
-  labs(title = "Aggodalom - multilevel modellek bootstrappelt becslései",
-       x = "Bootstrappelt becslések (95% CI)", 
+  coord_cartesian(ylim=c(1, 4)) + 
+  scale_x_continuous(limits = c(0, 8), breaks = c(0, 2, 4, 6, 8)) +
+  # labs(title = "A dimenziók hatása az aggodalom átlagszintjére multilevel modell eredményei alapján",
+       # x = "MSS-B dimenziók pontszáma", 
+       # y = "Aggodalom átlaga") + 
+  labs(title = NULL,
+       x = NULL, 
        y = NULL) + 
   theme_minimal(base_size = 10) +
-  theme(
-    legend.position = "right",
-    panel.grid.major.y = element_blank(),
-    panel.grid.minor.y = element_blank())
+  theme(plot.margin = unit(c(0.2, 0.2, 1, 0.2), "cm")) +
+  facet_wrap(~ model)
 
-print(boot_worried)
+print(plot_lmer_all)
 
-#ggsave("boot_worried.png", plot = boot_worried, height = 12, width = 20, units = "cm", dpi = 300)
+```
+
+``` {r lmer plots facet}
+
+plot_lmer_facet <- ggplot(dat_lmer_facet, aes(dim_value, worried_value , color = dimension, fill = dimension)) +
+  geom_line(size = 1) + 
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.3, color = NA) +
+  scale_fill_manual(name = "Dimenzió",
+                    labels = c("Negatív", "Pozitív", "Dezorganizált"),
+                    values = colors) +
+  scale_color_manual(name = "Dimenzió",
+                     labels = c("Negatív", "Pozitív", "Dezorganizált"),
+                     values = colors) +
+  coord_cartesian(ylim=c(1, 4)) + 
+  scale_x_continuous(limits = c(0, 8), breaks = c(0, 2, 4, 6, 8)) +
+  theme_minimal(base_size = 10) +
+  facet_wrap(~ model, ncol = 2) +
+  # labs(title = "A dimenziók hatása az aggodalom átlagszintjére multilevel modell eredményei alapján",
+       # x = "MSS-B dimenziók pontszáma", 
+       # y = "Aggodalom átlaga",) +
+  labs(title = NULL,
+       x = NULL, 
+       y = "Aggodalom átlaga",) +
+  theme(legend.position = "none",
+        axis.title.y = element_text(vjust = 5)) +
+  theme(plot.margin = unit(c(0.2, 0.2, 1, 0.5), "cm"))
+
+print(plot_lmer_facet)
+
+# ggsave("plots/plot_lmer_facet.png", plot = plot_lmer_facet, height = 12, width = 16, units = "cm", dpi = 300)
+
+```
+
+``` {r lmer all plots patchwork}
+
+# library(patchwork)
+# library(cowplot)
+
+plot_lmer_grid <- plot_grid(plot_lmer_facet, plot_lmer_all, ncol = 2) 
+
+plot_lmer <- ggdraw(plot_lmer_grid) + 
+  draw_label("MSS-B dimenziók pontszáma", x = 0.5, y = 0.04, vjust = 0, size = 10) 
+
+print(plot_lmer)
+
+# ggsave("plots/plot_lmer.png", plot = plot_lmer, height = 10, width = 20, units = "cm", dpi = 300)
 
 ```
