@@ -22,6 +22,7 @@ library(tidyverse)
 library(dplyr)
 library(lme4)
 library(lmerTest)
+library(MuMIn)
 library(broom)
 library(lavaan)
 library(sjPlot)
@@ -49,6 +50,7 @@ library(performance)
 library(metafor)
 
 ```
+
 ``` {r import dataset, message=FALSE, warning=FALSE}
 
 dat_1 <- read_csv("dat_1_m.csv")
@@ -86,6 +88,25 @@ cat("\n--- SCH_POS + SCH_NEG + SCH_DIS ---\n")
 summary(m_all)
 
 tab_model(m_n, m_np, m_all, show.aicc = T, show.std = T, file = "lmer_models.doc")
+
+```
+
+``` {r}
+
+cat("\n--- Modell Magyarázóereje (m_n) ---\n")
+print(r.squaredGLMM(m_n))
+cat("\n--- Modell Magyarázóereje (m_p) ---\n")
+print(r.squaredGLMM(m_p))
+cat("\n--- Modell Magyarázóereje (m_d) ---\n")
+print(r.squaredGLMM(m_d))
+cat("\n--- Modell Magyarázóereje (m_np) ---\n")
+print(r.squaredGLMM(m_np))
+cat("\n--- Modell Magyarázóereje (m_pd) ---\n")
+print(r.squaredGLMM(m_pd))
+cat("\n--- Modell Magyarázóereje (m_nd) ---\n")
+print(r.squaredGLMM(m_nd))
+cat("\n--- Modell Magyarázóereje (m_all) ---\n")
+print(r.squaredGLMM(m_all))
 
 ```
 
@@ -234,11 +255,11 @@ df_m_nd_d <- build_plot_data(model = m_nd, raw_data = dat_1, focal_var = "sch_di
                              model_name = "Dezorganizált - Negatív")
 
 df_m_all_n <- build_plot_data(model = m_all, raw_data = dat_1, focal_var = "sch_neg", 
-                              model_name = "Negatív - Pozitív - Dezorganizáció")
+                              model_name = "Negatív - Pozitív - Dezorganizált")
 df_m_all_p <- build_plot_data(model = m_all, raw_data = dat_1, focal_var = "sch_pos", 
-                              model_name = "Negatív - Pozitív - Dezorganizáció")
+                              model_name = "Negatív - Pozitív - Dezorganizált")
 df_m_all_d <- build_plot_data(model = m_all, raw_data = dat_1, focal_var = "sch_dis", 
-                              model_name = "Negatív - Pozitív - Dezorganizáció")
+                              model_name = "Negatív - Pozitív - Dezorganizált")
 
 ### Bind rows datasets
 

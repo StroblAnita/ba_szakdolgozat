@@ -214,12 +214,21 @@ dat_compl_vis <- dat_1 %>%
   group_by(id_esm) %>%
   reframe(compl_n  = sum(!is.na(worried)),
           all_answer = maxday * 8,
-          compl_pct = (compl_n / all_answer) * 100) %>%
+          compl_pct = (compl_n / all_answer) * 100,) %>%
   ungroup() %>%
   distinct()
+
+dat_compl_mdn <- dat_compl_vis %>%
+  summarize(mdn_compl = round(median(compl_pct, na.rm = T), digits = 2))
   
 compl_vis <- ggplot(dat_compl_vis) +
-  geom_histogram(aes(compl_pct), bins = 40, fill = "#8DD3C7") +
+  geom_histogram(aes(compl_pct), bins = 40, fill = "#66C2A5", color = "#44816e") +
+  geom_vline(data = dat_compl_mdn, 
+             aes(xintercept = mdn_compl), 
+             linetype = "dotted", color = "grey35", linewidth = 0.8)+ 
+  geom_text(data = dat_compl_mdn, 
+            aes(x = mdn_compl, y = Inf, label = paste("Md =", sprintf("%.2f", mdn_compl))), 
+            vjust = 5, hjust = -0.1, fontface = "italic", size = 3.5) +
   labs(
     x = "Együttműködési ráta (%)",
     y = "Résztvevők száma") +
@@ -227,6 +236,8 @@ compl_vis <- ggplot(dat_compl_vis) +
   theme(axis.title = element_text(size = 10))
 
 print(compl_vis)
+
+ggsave("plots/compl_vis.png", plot = compl_vis, width = 16, height = 12, units = "cm", dpi = 300)
 
 ```
 
@@ -268,17 +279,23 @@ dat_mss_vis <- dat_1 %>%
   distinct() %>%
   pivot_longer(cols = c(sch_neg, sch_pos, sch_dis), names_to = "group", values_to = "value") %>%
   mutate(group = factor(group, 
-                        levels = c("sch_pos", "sch_neg", "sch_dis",
-                        labels = c("Pozitív", "Negatív", "Dezorganizált"))))
+                        levels = c("sch_neg", "sch_pos", "sch_dis",
+                        labels = c("Negatív", "Pozitív", "Dezorganizált"))))
 
-sch_color <- c("#FC8D62", "#80B1D3", "#BC80BD")
+sch_fill <- c("#FC8D62", "#80B1D3", "#BC80BD")
+sch_color <- c("#97553b", "#4d6a7f", "#714d71")
 
-mss_vis <- ggplot(dat_mss_vis, aes(group, value, fill = group)) +
-  geom_violinhalf(color = NA, alpha = 0.9, position = position_nudge(x = 0.2, y = 0)) +
-  geom_boxplot(color = "#505354", alpha = 0.9, width = 0.25, position = position_dodge(width = 0.3), outlier.shape = NA) + 
+mss_vis <- ggplot(dat_mss_vis, aes(group, value, fill = group, color = group)) +
+  geom_violinhalf(alpha = 0.9, position = position_nudge(x = 0.2, y = 0)) +
+  geom_boxplot(color = sch_color, alpha = 0.9, width = 0.25, position = position_dodge(width = 0.3), outlier.shape = NA) + 
   scale_fill_manual(name = "MSS-B dimenziók", 
-                    labels = c("Pozitív", "Negatív", "Dezorganizált"), values = sch_color) +
+                    labels = c("Pozitív", "Negatív", "Dezorganizált"), 
+                    values = sch_fill) +
+  scale_color_manual(name = "MSS-B dimenziók", 
+                    labels = c("Pozitív", "Negatív", "Dezorganizált"), 
+                    values = sch_color) +
   scale_x_discrete(labels =c("Pozitív", "Negatív", "Dezorganizált"))  +
+  scale_y_continuous(limits = c(0, 12), breaks = c(0, 4, 8, 12)) +
   labs(x = "MSS-B dimenziók", 
        y = "MSS-B dimenziók pontszáma") + 
   theme_minimal(base_size = 12) +
@@ -288,6 +305,8 @@ mss_vis <- ggplot(dat_mss_vis, aes(group, value, fill = group)) +
         legend.position = "right")
 
 print(mss_vis)
+
+ggsave("plots/mss_vis.png", plot = mss_vis, width = 16, height = 12, units = "cm", dpi = 300)
 
 ```
 
@@ -350,10 +369,10 @@ summary_worried_between <- dat_distinct_worried %>%
 tibble(summary_worried_between)
 
 worried_bw_vis <- ggplot(dat_distinct_worried, aes(worried_between)) +
-  geom_histogram(bins = 40, fill = "#E5C494") +
+  geom_histogram(bins = 40, fill = "#E5C494", color = "#b79d76") +
   geom_vline(data = summary_worried_between, 
              aes(xintercept = mdn_worried), 
-             linetype = "dotted", color = "#505354", linewidth = 0.8)+ 
+             linetype = "dotted", color = "grey35", linewidth = 0.8)+ 
   geom_text(data = summary_worried_between, 
             aes(x = mdn_worried, y = Inf, label = paste("Md =", sprintf("%.2f", mdn_worried))), 
             vjust = 5, hjust = -0.1, fontface = "italic", size = 3.5) +
@@ -364,6 +383,8 @@ worried_bw_vis <- ggplot(dat_distinct_worried, aes(worried_between)) +
   theme(axis.title = element_text(size = 10))
 
 print(worried_bw_vis)
+
+ggsave("plots/worried_bw_vis.png", plot = worried_bw_vis, width = 14, height = 12, units = "cm", dpi = 300)
 
 ```
 
@@ -378,17 +399,26 @@ worried_wi_vis <- dat_1 %>%
   filter(!is.na(sd_worried)) %>%
   ungroup()
 
-worried_wi_vis1 <- ggplot(worried_wi_vis, aes(id_esm, mean_worried)) +
-  geom_pointrange(aes(ymin = mean_worried - sd_worried, ymax = mean_worried + sd_worried), color = "#E5C494", size = 0.2) +
+worried_wi_vis <- ggplot(worried_wi_vis, aes(id_esm, mean_worried)) +
+  geom_pointrange(aes(ymin = mean_worried - sd_worried, ymax = mean_worried + sd_worried), 
+                  color = "#E5C494", size = 0.01, linewidth = 0.5,
+                  position = position_dodge(width = 2)) +
+    geom_hline(data = summary_worried_between, aes(yintercept = mdn_worried), linetype = "dotted", color = "grey35", size = 0.6) + 
+  geom_text(data = summary_worried_between, aes(y = mdn_worried, x = Inf, label = paste("Md =", sprintf("%.2f", mdn_worried))), vjust = -0.3, hjust = 1, fontface = "italic", size = 3.5) +
   scale_x_discrete(breaks = function(x) x[seq(1, length(x), by = 10)]) +
   labs(
     x = "Résztvevők",
-    y = "Aggodalom átlaga és szórása (SE)"
+    y = "Aggodalom átlaga és szórása (SE) az ESM adatfelvétel során"
   ) +
   theme_minimal() +
   theme(axis.text.x = element_blank()) 
 
-print(worried_wi_vis1)
+print(worried_wi_vis)
+
+ggsave("plots/worried_wi_vis.png", plot = worried_wi_vis, width = 20, height = 12, units = "cm", dpi = 300)
+
+```
+``` {r worried_within_visualization 2.0}
 
 # Visualizing within worried in "normality shape"
 worried_wi_vis_2 <- dat_1 %>%
@@ -423,7 +453,7 @@ print(worried_wi_vis2)
 # Visualizing 3.0
 worried_wi_vis3 <- ggplot(worried_wi_vis, aes(mean_worried, id_esm)) +
   geom_pointrange(aes(xmin = mean_worried - sd_worried, xmax = mean_worried + sd_worried), color = "#E5C494", size = 0.1) +
-  geom_vline(data = summary_worried_between, aes(xintercept = mdn_worried), linetype = "dotted", color = "#505354", size = 0.8)+ 
+  geom_vline(data = summary_worried_between, aes(xintercept = mdn_worried), linetype = "dotted", color = "#505354", size = 0.8) + 
   geom_text(data = summary_worried_between, aes(x = mdn_worried, y = Inf, label = paste("Md =", sprintf("%.2f", mdn_worried))), vjust = 5, hjust = -0.1, fontface = "italic", size = 3.5) +
   scale_y_discrete(breaks = function(x) x[seq(1, length(x), by = 10)]) +
   labs(

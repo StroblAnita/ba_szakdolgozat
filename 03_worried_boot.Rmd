@@ -22,6 +22,8 @@ library(tidyverse)
 library(dplyr)
 library(lme4)
 library(lmerTest)
+library(lmeresampler)
+library(MuMIn)
 library(broom)
 library(lavaan)
 library(sjPlot)
@@ -47,6 +49,8 @@ library(gridExtra)
 library(semTools)
 library(performance)
 library(metafor)
+library(readr)
+library(flextable)
 
 ```
 
@@ -72,31 +76,52 @@ m_all <- readRDS("lmer_models/m_all.rds")
 
 # lmeresampler package
 
-boot_m_n <- lmeresampler::bootstrap(m_n, .f = fixef, type = "wild", 
-              hccme =  "hc2", aux.dist = "mammen", 
-              B = 1000, resample = c(TRUE, TRUE))
+boot_m_n <- bootstrap(m_n, .f = function(x) {
+            r2 <- MuMIn::r.squaredGLMM(x)
+            c(fixef(x), R2m = r2[1, "R2m"], R2c = r2[1, "R2c"])}, 
+            type = "wild", 
+            hccme =  "hc2", aux.dist = "mammen", 
+            B = 1000, resample = c(TRUE, TRUE))
 
-boot_m_p <- lmeresampler::bootstrap(m_p, .f = fixef, type = "wild", 
-              hccme =  "hc2", aux.dist = "mammen", 
-              B = 1000, resample = c(TRUE, TRUE))
+boot_m_p <- bootstrap(m_p, .f = function(x) {
+            r2 <- MuMIn::r.squaredGLMM(x)
+            c(fixef(x), R2m = r2[1, "R2m"], R2c = r2[1, "R2c"])}, 
+            type = "wild", 
+            hccme =  "hc2", aux.dist = "mammen", 
+            B = 1000, resample = c(TRUE, TRUE))
 
-boot_m_d <- lmeresampler::bootstrap(m_d, .f = fixef, type = "wild", 
-              hccme =  "hc2", aux.dist = "mammen", 
-              B = 1000, resample = c(TRUE, TRUE))
+boot_m_d <- bootstrap(m_d, .f = function(x) {
+            r2 <- MuMIn::r.squaredGLMM(x)
+            c(fixef(x), R2m = r2[1, "R2m"], R2c = r2[1, "R2c"])}, 
+            type = "wild", 
+            hccme =  "hc2", aux.dist = "mammen", 
+            B = 1000, resample = c(TRUE, TRUE))
 
-boot_m_np <- lmeresampler::bootstrap(m_np, .f = fixef, type = "wild", 
-              hccme =  "hc2", aux.dist = "mammen", 
-              B = 1000, resample = c(TRUE, TRUE))
+boot_m_np <- bootstrap(m_np, .f = function(x) {
+             r2 <- MuMIn::r.squaredGLMM(x)
+             c(fixef(x), R2m = r2[1, "R2m"], R2c = r2[1, "R2c"])}, 
+             type = "wild", 
+             hccme =  "hc2", aux.dist = "mammen", 
+             B = 1000, resample = c(TRUE, TRUE))
 
-boot_m_pd <- lmeresampler::bootstrap(m_pd, .f = fixef, type = "wild", 
-              hccme =  "hc2", aux.dist = "mammen", 
-              B = 1000, resample = c(TRUE, TRUE))
+boot_m_pd <- bootstrap(m_pd, .f = function(x) {
+             r2 <- MuMIn::r.squaredGLMM(x)
+             c(fixef(x), R2m = r2[1, "R2m"], R2c = r2[1, "R2c"])}, 
+             type = "wild", 
+             hccme =  "hc2", aux.dist = "mammen", 
+             B = 1000, resample = c(TRUE, TRUE))
 
-boot_m_nd <- lmeresampler::bootstrap(m_nd, .f = fixef, type = "wild", 
-              hccme =  "hc2", aux.dist = "mammen", 
-              B = 1000, resample = c(TRUE, TRUE))
+boot_m_nd <- bootstrap(m_nd, .f = function(x) {
+             r2 <- MuMIn::r.squaredGLMM(x)
+             c(fixef(x), R2m = r2[1, "R2m"], R2c = r2[1, "R2c"])}, 
+             type = "wild", 
+             hccme =  "hc2", aux.dist = "mammen", 
+             B = 1000, resample = c(TRUE, TRUE))
 
-boot_m_all <- lmeresampler::bootstrap(m_all, .f = fixef, type = "wild", 
+boot_m_all <- bootstrap(m_all, .f = function(x) {
+              r2 <- MuMIn::r.squaredGLMM(x)
+              c(fixef(x), R2m = r2[1, "R2m"], R2c = r2[1, "R2c"])}, 
+              type = "wild", 
               hccme =  "hc2", aux.dist = "mammen", 
               B = 1000, resample = c(TRUE, TRUE))
 
@@ -113,13 +138,33 @@ boot_m_all <- lmeresampler::bootstrap(m_all, .f = fixef, type = "wild",
 # saveRDS(boot_m_nd, "boot_models/boot_m_nd.rds")
 # saveRDS(boot_m_all, "boot_models/boot_m_all.rds")
 
-boot_m_p <- readRDS("boot_models/boot_m_n.rds")
-boot_m_n <- readRDS("boot_models/boot_m_p.rds")
-boot_m_d <- readRDS("boot_models/boot_m_d.rds")
-boot_m_np <- readRDS("boot_models/boot_m_np.rds")
-boot_m_pd <- readRDS("boot_models/boot_m_pd.rds")
-boot_m_nd <- readRDS("boot_models/boot_m_nd.rds")
-boot_m_all <- readRDS("boot_models/boot_m_all.rds")
+# boot_m_n <- readRDS("boot_models/boot_m_n.rds")
+# boot_m_p <- readRDS("boot_models/boot_m_p.rds")
+# boot_m_d <- readRDS("boot_models/boot_m_d.rds")
+# boot_m_np <- readRDS("boot_models/boot_m_np.rds")
+# boot_m_pd <- readRDS("boot_models/boot_m_pd.rds")
+# boot_m_nd <- readRDS("boot_models/boot_m_nd.rds")
+# boot_m_all <- readRDS("boot_models/boot_m_all.rds")
+
+```
+
+``` {r save read boot r2 rds}
+
+# saveRDS(boot_m_n, "boot_models/boot_m_n_r2.rds")
+# saveRDS(boot_m_p, "boot_models/boot_m_p_r2.rds")
+# saveRDS(boot_m_d, "boot_models/boot_m_d_r2.rds")
+# saveRDS(boot_m_np, "boot_models/boot_m_np_r2.rds")
+# saveRDS(boot_m_pd, "boot_models/boot_m_pd_r2.rds")
+# saveRDS(boot_m_nd, "boot_models/boot_m_nd_r2.rds")
+# saveRDS(boot_m_all, "boot_models/boot_m_all_r2.rds")
+
+boot_m_n_r2 <- readRDS("boot_models/boot_m_n_r2.rds")
+boot_m_p_r2 <- readRDS("boot_models/boot_m_p_r2.rds")
+boot_m_d_r2 <- readRDS("boot_models/boot_m_d_r2.rds")
+boot_m_np_r2 <- readRDS("boot_models/boot_m_np_r2.rds")
+boot_m_pd_r2 <- readRDS("boot_models/boot_m_pd_r2.rds")
+boot_m_nd_r2 <- readRDS("boot_models/boot_m_nd_r2.rds")
+boot_m_all_r2 <- readRDS("boot_models/boot_m_all_r2.rds")
 
 ```
 
@@ -128,13 +173,13 @@ boot_m_all <- readRDS("boot_models/boot_m_all.rds")
 # lmersampler package
 
 boot_list <- list(
-  "Pozitív" = boot_m_p,
-  "Negatív" = boot_m_n,
-  "Dezorganizált" = boot_m_d,
-  "Negatív - Pozitív" = boot_m_np,
-  "Pozitív - Dezorganizált" = boot_m_pd,
-  "Negatív - Dezorganizált" = boot_m_nd,
-  "Pozitív - Negatív - Dezorganizált" = boot_m_all)
+  "Negatív" = boot_m_n_r2,
+  "Pozitív" = boot_m_p_r2,
+  "Dezorganizált" = boot_m_d_r2,
+  "Negatív - Pozitív" = boot_m_np_r2,
+  "Pozitív - Dezorganizált" = boot_m_pd_r2,
+  "Negatív - Dezorganizált" = boot_m_nd_r2,
+  "Pozitív - Negatív - Dezorganizált" = boot_m_all_r2)
 
 boot_table_f <- function(boot_table) {
   median <- apply(boot_table$replicates, 2, median) 
@@ -156,13 +201,56 @@ boot_table_f <- function(boot_table) {
   return(results)
 }
 
-boot_lmer_table <- map_df(boot_list, boot_table_f, .id = "model") %>%
-  filter(term != "(Intercept)") %>%
+all_results <- map_df(boot_list, boot_table_f, .id = "model")
+
+boot_lmer_table <- all_results %>%
+  filter(!term %in% c("(Intercept)", "R2m.R2m", "R2c.R2c")) %>%
   mutate(term = factor(term,
                       levels = c("sch_neg", "sch_pos", "sch_dis"),
                       labels = c("Negatív", "Pozitív", "Dezorganizált")))
 
-saveRDS(boot_lmer_table, "boot_models/boot_lmer_table")
+saveRDS(boot_lmer_table, "boot_models/boot_lmer_table.rds")
+
+boot_lmer_r2_table <- all_results %>%
+  filter(term %in% c("R2m.R2m", "R2c.R2c")) %>%
+  mutate(term = factor(term,
+                      levels = c("R2m.R2m", "R2c.R2c"),
+                      labels = c("Marginal R2", "Conditional R2")))
+
+saveRDS(boot_lmer_r2_table, "boot_models/boot_lmer_r2_table.rds")
+
+```
+
+``` {r save tables in docs}
+
+# Boot table
+
+boot_lmer_form<- boot_lmer_table %>%
+  mutate(
+    boot_p_value = format(round(boot_p_value, 3), nsmall = 3, decimal.mark = ","),
+    across(where(is.numeric), ~ format(round(.x, 2), nsmall = 2, decimal.mark = ",")))
+
+write_csv(boot_lmer_form, "boot_models/boot_lmer_form.csv")
+boot_lmer_form_csv <- read_csv("boot_models/boot_lmer_form.csv")
+
+boot_lmer_docx <- flextable(boot_lmer_form_csv)
+boot_lmer_docx <- autofit(boot_lmer_docx)
+save_as_docx(boot_lmer_docx, path = "tables/boot_lmer.docx")
+
+# Boot r2 table
+boot_r2_form <- boot_lmer_r2_table %>%
+  mutate(
+    boot_p_value = format(round(boot_p_value, 3), nsmall = 3, decimal.mark = ","),
+    orig_estimate	= format(round(orig_estimate, 3), nsmall = 3, decimal.mark = ","),
+    boot_median = format(round(boot_median, 3), nsmall = 3, decimal.mark = ","),
+    across(where(is.numeric), ~ format(round(.x, 2), nsmall = 2, decimal.mark = ",")))
+
+write_csv(boot_r2_form, "boot_models/boot_r2_form.csv")
+boot_lmer_r2_form_csv <- read_csv("boot_models/boot_r2_form.csv")
+
+boot_lmer_r2_docx <- flextable(boot_lmer_r2_form_csv)
+boot_lmer_r2_docx <- autofit(boot_lmer_r2_docx)
+save_as_docx(boot_lmer_r2_docx, path = "tables/boot_lmer_r2.docx")
 
 ```
 
@@ -176,8 +264,8 @@ boot_lmer_table$model <- factor(boot_lmer_table$model,
                                            "Pozitív - Dezorganizált",
                                            "Negatív - Pozitív",
                                            "Dezorganizált",
-                                           "Negatív",
-                                           "Pozitív"))
+                                           "Pozitív",
+                                           "Negatív"))
 
 boot_lmer_table <- boot_lmer_table %>%
   mutate(p_sign = case_when(
@@ -218,3 +306,4 @@ print(boot_worried)
 ggsave("plots/boot_worried.png", plot = boot_worried, height = 12, width = 20, units = "cm", dpi = 300)
 
 ```
+

@@ -1,0 +1,13 @@
+model,term,orig_estimate,boot_median,boot_se,boot_ci_lower,boot_ci_upper,boot_p_value,p_sign
+Negatív,Negatív,"-0,04","-0,04","0,03","-0,11"," 0,02","0,230","p > 0,05"
+Pozitív,Pozitív," 0,13"," 0,13","0,05"," 0,03"," 0,24","0,012","p < 0,05"
+Dezorganizált,Dezorganizált," 0,12"," 0,13","0,03"," 0,06"," 0,19","0,000","p < 0,05"
+Negatív - Pozitív,Negatív,"-0,04","-0,04","0,03","-0,10"," 0,02","0,178","p > 0,05"
+Negatív - Pozitív,Pozitív," 0,13"," 0,13","0,05"," 0,03"," 0,24","0,006","p < 0,05"
+Pozitív - Dezorganizált,Pozitív," 0,08"," 0,08","0,06","-0,02"," 0,21","0,118","p > 0,05"
+Pozitív - Dezorganizált,Dezorganizált," 0,11"," 0,11","0,04"," 0,03"," 0,17","0,002","p < 0,05"
+Negatív - Dezorganizált,Negatív,"-0,07","-0,06","0,03","-0,12","-0,01","0,016","p < 0,05"
+Negatív - Dezorganizált,Dezorganizált," 0,13"," 0,13","0,03"," 0,07"," 0,19","0,000","p < 0,05"
+Pozitív - Negatív - Dezorganizált,Negatív,"-0,06","-0,06","0,03","-0,12","-0,01","0,032","p < 0,05"
+Pozitív - Negatív - Dezorganizált,Pozitív," 0,08"," 0,08","0,06","-0,03"," 0,19","0,162","p > 0,05"
+Pozitív - Negatív - Dezorganizált,Dezorganizált," 0,12"," 0,12","0,03"," 0,05"," 0,18","0,000","p < 0,05"
