@@ -52,6 +52,7 @@ library(performance)
 library(metafor)
 library(readr)
 library(flextable)
+library(Hmisc)
 
 ```
 
@@ -60,3 +61,182 @@ library(flextable)
 dat_1 <- read_csv("dat_1_m.csv")
 
 ```
+
+``` {r compliance worried sch}
+
+### Database
+
+# 1. Calculate person-level statistics (worry mean and compliance rates)
+dat_compliance_and_worry <- dat_1 %>%
+  group_by(id_esm) %>%
+  summarise(
+    worried_mean = mean(as.numeric(gsub(",", ".", as.character(worried))), na.rm = TRUE),
+    compl_n = sum(!is.na(worried)),
+    maxday = max(day[!is.na(worried)], na.rm = TRUE),
+    # Compliance rate until the last active day (active compliance)
+    all_answer_active = maxday * 8,
+    compl_pct_active = (compl_n / all_answer_active) * 100,
+    # Absolute compliance rate calculated for the total 28 days
+    all_answer_absolute = 28 * 8,
+    compl_pct_absolute = (compl_n / all_answer_absolute) * 100
+  ) %>%
+  ungroup()
+
+# 2. Extract fix baseline MSS-B scores per person
+dat_mssb_scores <- dat_1 %>%
+  distinct(id_esm, .keep_all = TRUE) %>%
+  select(id_esm, sch_neg, sch_pos, sch_dis)
+
+# 3. Merge datasets to create the clean person-level dataframe
+dat_person_level <- dat_mssb_scores %>%
+  left_join(dat_compliance_and_worry, by = "id_esm") %>%
+  select(id_esm, sch_neg, sch_pos, sch_dis, worried_mean, compl_pct_active, compl_pct_absolute)
+
+# View the final person-level dataset
+tibble(dat_person_level)
+
+### Correlation
+
+# Select numeric columns for the correlation matrix
+cor_data <- dat_person_level %>%
+  select(sch_neg, sch_pos, sch_dis, worried_mean, compl_pct_active, compl_pct_absolute)
+
+# Run correlation analysis (Pearson by default)
+cor_matrix <- rcorr(as.matrix(cor_data), type = "pearson")
+
+# Print the correlation coefficients (r)
+print("Correlation coefficients (r):")
+print(round(cor_matrix$r, digits = 2))
+
+# Print the significance levels (p)
+print("Significance levels (p):")
+print(round(cor_matrix$P, digits = 3))
+
+```
+
+``` {r compl worried sch lmer}
+
+# 1. Left join compl_pct_active
+dat_1 <- dat_1 %>%
+  left_join(
+    dat_person_level %>% select(id_esm, compl_pct_active), 
+    by = "id_esm")
+
+# 2. Run separate models for each schizotypy dimension as a safety check
+
+m_dc <- lmer(worried ~ sch_dis * compl_pct_active + (1 | id_esm), data = dat_1)
+cat("\n--- SCH_DIS ---\n")
+summary(m_dc)
+
+m_pc <- lmer(worried ~ sch_pos * compl_pct_active + (1 | id_esm), data = dat_1)
+cat("\n--- SCH_POS ---\n")
+summary(m_pc)
+
+m_nc <- lmer(worried ~ sch_neg * compl_pct_active + (1 | id_esm), data = dat_1)
+cat("\n--- SCH_NEG ---\n")
+summary(m_nc)
+
+# 3. Run the large, combined model to test unique predictive effects
+m_dpnc <- lmer(worried ~ (sch_dis + sch_pos + sch_neg) * compl_pct_active + (1 | id_esm), data = dat_1)
+cat("\n--- SCH_ALL ---\n")
+summary(m_dpnc)
+
+```
+
+``` {r compl worried sch lmer visu}
+
+library(interactions)
+library(jtools)
+library(ggplot2)
+
+### DEZORGANIZED
+colors_dis <- c("#E2C2E3", "#BC80BD", "#804881")
+
+plot_dis_int <- interact_plot(
+  model = m_dpnc,
+  pred = sch_dis,
+  modx = compl_pct_active,
+  modx.values = c(18.52, 30.48, 38.39), 
+  plot.points = FALSE,                  
+  interval = TRUE,                      
+  x.label = "Dezorganizált dimenzió",
+  y.label = "Az aggodalom prediktált szintje",
+  main.title = "A dezorganizált skizotípia és az aktív együttműködés interakciós hatása az aggodalomra",
+  legend.main = "Az együttműködés mértéke")
+
+plot_dis_int <- plot_dis_int + 
+  scale_color_gradientn(
+    colors = colors_dis, 
+    breaks = c(18.52, 30.48, 38.39),
+    labels = c("Átlag - 1 SD", "Átlag", "Átlag + 1 SD"),
+    guide = guide_legend()) +
+  scale_fill_gradientn(
+    colors = colors_dis, 
+    breaks = c(18.52, 30.48, 38.39),
+    labels = c("Átlag - 1 SD", "Átlag", "Átlag + 1 SD"),
+    guide = guide_legend())
+
+print(plot_dis_int)
+
+
+### POSITIVE
+colors_pos <- c("#FFD1B3", "#FC8D62", "#B3532C")
+
+plot_pos_int <- interact_plot(
+  model = m_dpnc,
+  pred = sch_pos,
+  modx = compl_pct_active,
+  modx.values = c(18.52, 30.48, 38.39), 
+  plot.points = FALSE,                  
+  interval = TRUE,                      
+  x.label = "Pozitív dimenzió",
+  y.label = "Az aggodalom prediktált szintje",
+  main.title = "A pozitív skizotípia és az aktív együttműködés interakciós hatása az aggodalomra",
+  legend.main = "Az együttműködés mértéke")
+
+plot_pos_int <- plot_pos_int + 
+  scale_color_gradientn(
+    colors = colors_pos, 
+    breaks = c(18.52, 30.48, 38.39),
+    labels = c("Átlag - 1 SD", "Átlag", "Átlag + 1 SD"),
+    guide = guide_legend()) +
+  scale_fill_gradientn(
+    colors = colors_pos, 
+    breaks = c(18.52, 30.48, 38.39),
+    labels = c("Átlag - 1 SD", "Átlag", "Átlag + 1 SD"),
+    guide = guide_legend())
+
+print(plot_pos_int)
+
+### NEGATIVE
+colors_neg <- c("#C5DEEE", "#80B1D3", "#417293")
+
+plot_neg_int <- interact_plot(
+  model = m_dpnc,
+  pred = sch_neg,
+  modx = compl_pct_active,
+  modx.values = c(18.52, 30.48, 38.39), 
+  plot.points = FALSE,                  
+  interval = TRUE,                      
+  x.label = "Negatív dimenzió",
+  y.label = "Az aggodalom prediktált szintje",
+  main.title = "A negatív skizotípia és az aktív együttműködés interakciós hatása az aggodalomra",
+  legend.main = "Az együttműködés mértéke")
+
+plot_neg_int <- plot_neg_int + 
+  scale_color_gradientn(
+    colors = colors_neg, 
+    breaks = c(18.52, 30.48, 38.39),
+    labels = c("Átlag - 1 SD", "Átlag", "Átlag + 1 SD"),
+    guide = guide_legend()) +
+  scale_fill_gradientn(
+    colors = colors_neg, 
+    breaks = c(18.52, 30.48, 38.39),
+    labels = c("Átlag - 1 SD", "Átlag", "Átlag + 1 SD"),
+    guide = guide_legend())
+
+print(plot_neg_int)
+
+```
+
+
