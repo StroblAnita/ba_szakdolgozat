@@ -1,0 +1,62 @@
+---
+title: "04_worried_defend"
+author: "Stróbl Anita"
+date: "Last compiled on `r format(Sys.time(), '%d/%m/%Y, %X %Z')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 5
+    code_folding: hide
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+
+```{r message=FALSE, warning=FALSE}
+
+options(scipen = 999)
+
+library(psych)
+library(tidyverse)
+library(dplyr)
+library(lme4)
+library(lmerTest)
+library(lmeresampler)
+library(MuMIn)
+library(broom)
+library(lavaan)
+library(sjPlot)
+library(car)
+library(data.table)
+library(tibble)
+library(lubridate)
+library(naniar)
+library(hms)
+library(skimr)
+library(ggplot2)
+library(janitor)
+library(scales) 
+library(FSA)
+library(PMCMRplus)
+library(lsr)
+library(misty)
+library(rstatix)
+library(see)
+library(gridExtra)
+library(see)
+library(gridExtra)
+library(semTools)
+library(performance)
+library(metafor)
+library(readr)
+library(flextable)
+
+```
+
+``` {r import dataset, message=FALSE, warning=FALSE}
+
+dat_1 <- read_csv("dat_1_m.csv")
+
+```
