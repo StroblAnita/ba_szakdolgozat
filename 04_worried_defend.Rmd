@@ -238,5 +238,257 @@ plot_neg_int <- plot_neg_int +
 print(plot_neg_int)
 
 ```
+``` {r neg 2}
 
+dat_2_m <- read.csv("dat_1.csv")
+
+### Making sex variable considered as a factor
+dat_2_m  <-  
+  dat_2_m %>%
+  mutate(sex = factor(sex, levels = c(2, 1, 3), labels = c("Férfi", "Nő", "Egyéb")))
+
+### Making edu variable consideres as a factor
+dat_2_m  <-  dat_2_m %>%
+  mutate(edu = factor(edu, levels = c(1, 2, 3, 4, 5, 6, 7), 
+                      labels = c("Általános iskola vagy alacsonyabb",
+                                 "Középiskola érettségi nélkül", 
+                                 "Középiskola érettségivel",
+                                 "Egyetemi alap diploma",
+                                 "Egyetemi mester diploma",
+                                 "Doktori fokozat (PhD)", 
+                                 "Egyéb")))
+
+### Calculate MSS-B values
+
+mssb_items2 <- list(
+  mssb_reverse = c("mss_bh_4", "mss_bh_10", "mss_bh_25", "mss_bh_37"),
+  mssb_neg_aff = c("mss_bh_1", "mss_bh_13", "mss_bh_19", "mss_bh_28", "mss_bh_34"),
+  mssb_neg_soc = c("mss_bh_4", "mss_bh_7", "mss_bh_10", "mss_bh_16", "mss_bh_22", "mss_bh_25", "mss_bh_31", "mss_bh_37"),
+  mssb_pos = paste0("mss_bh_", seq(2, 35, by = 3)), #ms_bh_38-
+  mssb_dis = paste0("mss_bh_", seq(3, 36, by = 3)))
+
+dat_2_m <- dat_2_m %>% 
+  mutate(dat = "dat_2_m") %>%
+  mutate(sch_neg_aff = rowSums(select(., all_of(mssb_items2$mssb_neg_aff)), na.rm = T),
+         sch_neg_soc = rowSums(select(., all_of(mssb_items2$mssb_neg_soc)), na.rm = T),
+         sch_pos = rowSums(select(., all_of(mssb_items2$mssb_pos)), na.rm = T),
+         sch_dis = rowSums(select(., all_of(mssb_items2$mssb_dis)), na.rm = T))
+
+write_csv(dat_2_m, "dat_2_m.csv")
+
+dat_2 <- read_csv("dat_2_m.csv")
+
+```
+
+``` {r lmer}
+
+m_n2 <- lmer(worried ~ sch_neg_aff + sch_neg_soc + (1|id_esm), data = dat_2)
+  
+cat("\n--- SCH_NEG ---\n")
+summary(m_n2)
+
+library(sjPlot)
+library(ggplot2)
+
+# Mindkét prediktorra kiszámoljuk a marginalis hatást
+p1 <- plot_model(m_n2, type = "pred", terms = "sch_neg_aff") + 
+  labs(title = "Affektív anhedónia hatása", x = "Affektív anhedónia", y = "Aggódás (worried)") +
+  theme_minimal()
+
+p2 <- plot_model(m_n2, type = "pred", terms = "sch_neg_soc") + 
+  labs(title = "Szociális anhedónia hatása", x = "Szociális anhedónia", y = "Aggódás (worried)") +
+  theme_minimal()
+
+library(patchwork)
+p1 + p2
+
+m_4 <- lmer(worried ~ sch_neg_aff + sch_neg_soc + sch_pos + sch_dis + (1|id_esm), data = dat_2)
+
+cat("\n--- SCH_ALL ---\n")
+summary(m_4)
+
+library(sjPlot)
+library(ggplot2)
+library(patchwork)
+
+# 1. Affektív anhedónia
+p1 <- plot_model(m_4, type = "pred", terms = "sch_neg_aff") + 
+  labs(title = "Affektív anhedónia hatása", x = "Affektív anhedónia", y = "Aggódás (worried)") +
+  theme_minimal()
+
+# 2. Szociális anhedónia
+p2 <- plot_model(m_4, type = "pred", terms = "sch_neg_soc") + 
+  labs(title = "Szociális anhedónia hatása", x = "Szociális anhedónia", y = "Aggódás (worried)") +
+  theme_minimal()
+
+# 3. Pozitív skizotípia
+p3 <- plot_model(m_4, type = "pred", terms = "sch_pos") + 
+  labs(title = "Pozitív skizotípia hatása", x = "Pozitív skizotípia", y = "Aggódás (worried)") +
+  theme_minimal()
+
+# 4. Dezorganizált skizotípia
+p4 <- plot_model(m_4, type = "pred", terms = "sch_dis") + 
+  labs(title = "Dezorganizált skizotípia hatása", x = "Dezorganizált skizotípia", y = "Aggódás (worried)") +
+  theme_minimal()
+
+# A 4 ábra összefűzése egy 2x2-es rácsba egy közös címmel
+(p1 + p2) / (p3 + p4) + 
+  plot_annotation(title = "Skizotípia dimenziók marginális hatásai az aggódásra",
+                  subtitle = "A modell az összes többi prediktort átlagos értéken kontrollálja",
+                  theme = theme(plot.title = element_text(face = "bold", size = 16)))
+
+```
+
+``` {r item by item}
+
+# Szükséges csomagok betöltése
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+# 1. Az itemek definiálása
+mssb_neg_aff <- c("mss_bh_1", "mss_bh_13", "mss_bh_19", "mss_bh_28", "mss_bh_34")
+mssb_neg_soc <- c("mss_bh_4", "mss_bh_7", "mss_bh_10", "mss_bh_16", "mss_bh_22", "mss_bh_25", "mss_bh_31", "mss_bh_37")
+all_neg_items <- c(mssb_neg_aff, mssb_neg_soc)
+
+# 2. Adatok aggregálása személyi szintre (Level 2)
+# Az MSS-B válaszok személyenként állandóak, így a first() függvénnyel emeljük ki őket
+person_level_data <- dat_2 %>%
+  group_by(id_esm) %>%
+  summarise(
+    worried_mean = mean(as.numeric(gsub(",", ".", as.character(worried))), na.rm = TRUE),
+    across(all_of(all_neg_items), ~ first(.), .names = "{.col}")
+  ) %>%
+  ungroup()
+
+# 3. Adatok 'long' formátummá alakítása a korrelációhoz és ábrázoláshoz
+long_data <- person_level_data %>%
+  pivot_longer(
+    cols = all_of(all_neg_items),
+    names_to = "Item",
+    values_to = "Score"
+  ) %>%
+  mutate(
+    Alskala = ifelse(Item %in% mssb_neg_aff, "Affektív anhedónia", "Szociális anhedónia")
+  ) %>%
+  filter(!is.na(Score) & !is.na(worried_mean))
+
+# 1. Biztosítsuk, hogy a Score numerikus (0 és 1) legyen. 
+# Ha a te adatodban eleve 0/1, ez a lépés nem rontja el. 
+# Ha szöveges (pl. "Igaz"/"Hamis"), akkor itt át kell kódolni.
+long_data <- long_data %>%
+  mutate(
+    # Példa átkódolás: ha "Igen"/"Igaz" a válasz, legyen 1, különben 0. 
+    # (Ezt módosítsd a saját adatbázisod pontos szövegezése szerint, ha nem számok vannak benne!)
+    Score_num = as.numeric(Score) 
+  )
+
+# 2. Pont-biszeriális (Pearson) korrelációk kiszámítása itemenként
+cat("\n--- Pont-biszeriális korrelációk az aggodalom átlagával ---\n")
+item_correlations <- long_data %>%
+  group_by(Item, Alskala) %>%
+  summarise(
+    r_pb = round(cor(Score_num, worried_mean, method = "pearson"), 3),
+    p_value = round(cor.test(Score_num, worried_mean, method = "pearson")$p.value, 3),
+    .groups = "drop"
+  ) %>%
+  arrange(Alskala, desc(r_pb))
+
+# Eredmények megtekintése
+print(as.data.frame(item_correlations))
+
+library(ggplot2)
+library(ggrepel)
+
+# 1. Kiszámoljuk a regressziós vonalak végpontjait az 1-es értékre (Igen/Igaz)
+label_data_pb <- long_data %>%
+  group_by(Item, Alskala) %>%
+  summarise(
+    x_pos = 1, # A vonal vége most fixen az 1-es értéknél van
+    y_pos = predict(lm(worried_mean ~ Score_num), newdata = data.frame(Score_num = 1)),
+    .groups = "drop"
+  ) %>%
+  mutate(Item_num = gsub("mss_bh_", "", Item))
+
+# 2. Az ábra elkészítése a bináris (0-1) logika alapján
+ggplot(long_data, aes(x = Score_num, y = worried_mean, group = Item, color = Alskala)) +
+  # Regressziós egyenesek kirajzolása
+  geom_smooth(method = "lm", se = FALSE, linewidth = 1.2, alpha = 0.8) + 
+  
+  # Feliratok elhelyezése a vonalak végén
+  geom_text_repel(
+    data = label_data_pb, 
+    aes(x = x_pos, y = y_pos, label = Item_num),
+    nudge_x = 0.08,         # Kisebb eltolás, mivel a skála 0-tól 1-ig tart
+    direction = "y",        
+    hjust = 0,              
+    fontface = "bold",
+    size = 4.5,
+    show.legend = FALSE     
+  ) +
+  
+  scale_color_manual(values = c("Affektív anhedónia" = "#d35400", "Szociális anhedónia" = "#2980b9")) +
+  
+  # Az X tengely fixálása a bináris válaszokhoz
+  scale_x_continuous(
+    breaks = c(0, 1), 
+    labels = c("0\n(Nem/Hamis)", "1\n(Igen/Igaz)"), # Sortöréssel, hogy szellős legyen
+    expand = expansion(mult = c(0.05, 0.15))
+  ) +
+  
+  labs(
+    title = "A negatív skizotípia tételek és az átlagos aggodalom kapcsolata",
+    subtitle = "A vonalak a pont-biszeriális trendeket mutatják. A számok az MSS-B sorszámai.",
+    x = "Item válasz (Bináris kódolás)",
+    y = "Átlagos napi aggodalom (worried_mean)",
+    color = "Dimenzió"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "bottom",
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(face = "bold")
+  )
+
+```
+``` {r}
+
+# Ha nincs telepítve, futtasd: install.packages("psych")
+library(psych)
+library(dplyr)
+
+# 1. Az elemzendő tételek listája (összes negatív item)
+all_neg_items <- c("mss_bh_1", "mss_bh_13", "mss_bh_19", "mss_bh_28", "mss_bh_34", 
+                   "mss_bh_4", "mss_bh_7", "mss_bh_10", "mss_bh_16", "mss_bh_22", 
+                   "mss_bh_25", "mss_bh_31", "mss_bh_37")
+
+# 2. Adat-előkészítés: Személyenként 1 sor kinyerése és numerikussá alakítása
+# Fontos: győződj meg róla, hogy a válaszok 0/1 formátumra vannak kódolva!
+person_data_efa <- dat_2 %>%
+  group_by(id_esm) %>%
+  summarise(across(all_of(all_neg_items), ~ as.numeric(first(.)))) %>%
+  ungroup() %>%
+  select(-id_esm) # Eltávolítjuk az ID-t, hogy csak a kérdőíves oszlopok maradjanak a mátrixban
+
+# 3. Feltáró Faktorelemzés (EFA) futtatása
+# nfactors = 2: 2 faktort kérünk
+# rotate = "oblimin": Engedjük, hogy a két faktor korreláljon (pszichológiai skáláknál szinte mindig korrelálnak)
+# cor = "tet": Tetrachorikus korreláció használata a bináris adatok miatt!
+efa_model <- fa(person_data_efa, 
+                nfactors = 2, 
+                rotate = "oblimin", 
+                cor = "tet")
+
+# 4. Eredmények kiíratása a konzolra
+cat("\n--- Faktor-súlyok (Loadings) ---\n")
+# A sort = TRUE sorrendbe teszi a tételeket a súlyuk alapján, a cutoff = 0.3 pedig elrejti a gyenge töltéseket
+print(efa_model$loadings, cutoff = 0.3, sort = TRUE)
+
+# 5. Látványos ábra készítése a struktúráról
+fa.diagram(efa_model, 
+           main = "MSS-B Negatív Dimenziók (2 faktoros modell)", 
+           cut = 0.3,       # Csak a 0.3-nál erősebb kapcsolatokat rajzolja ki
+           simple = FALSE)  # simple = FALSE: megmutatja az esetleges keresztöltéseket is
+
+```
 
